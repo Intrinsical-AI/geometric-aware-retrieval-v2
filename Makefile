@@ -19,7 +19,7 @@ clean:
 	rm -rf .ruff_cache/
 
 summary:
-	python scripts/concat.py
+	@echo "No summary script available"
 
 activate_env:
 	source .venv/bin/activate

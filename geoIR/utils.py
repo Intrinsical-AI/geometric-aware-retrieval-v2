@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Módulo de utilidades generales para el proyecto."""
+"""Utility helpers used across the project."""
 
 import random
 import time
@@ -13,7 +13,7 @@ from sentence_transformers import SentenceTransformer
 
 
 def seed_all(seed: int = 42):
-    """Fija todas las semillas para reproducibilidad."""
+    """Set all random seeds for reproducibility."""
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -21,7 +21,8 @@ def seed_all(seed: int = 42):
 
 
 def timeit(fn):
-    """Decorador simple para medir tiempo de ejecución."""
+    """Simple decorator to measure execution time."""
+
     @wraps(fn)
     def wrapper(*args, **kwargs):
         start_time = time.time()
@@ -29,6 +30,7 @@ def timeit(fn):
         end_time = time.time()
         print(f"{fn.__name__} took {end_time - start_time:.4f} seconds")
         return result
+
     return wrapper
 
 
@@ -46,7 +48,7 @@ def encode_corpus(
     batch_size: int = 256,
     device: str = "cpu",
 ) -> torch.Tensor:
-    """Codifica una lista de textos usando el modelo de SentenceTransformers."""
+    """Encode a list of texts with a SentenceTransformer model."""
     model.to(device)
     embeddings = model.encode(
         corpus_texts,
