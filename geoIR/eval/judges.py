@@ -6,6 +6,7 @@ This module defines a minimal interface so we can plug different judge engines
 required packages or keys are missing, the judge will raise a clear error so
 callers can skip/replace it.
 """
+
 from __future__ import annotations
 
 import os
@@ -13,7 +14,7 @@ from abc import ABC, abstractmethod
 from statistics import mean
 from typing import List
 
-from geoIR.geo.metrics import MetricResult
+from geoIR.eval.metrics import MetricResult
 
 __all__ = [
     "BaseJudge",
@@ -64,7 +65,9 @@ class OpenAIJudge(BaseJudge):  # noqa: D101
             {"role": "system", "content": prompt},
             {"role": "user", "content": f"Question: {question}\nAnswer: {answer}"},
         ]
-        resp = self._openai.ChatCompletion.create(model=self._model, messages=messages, temperature=0.0)
+        resp = self._openai.ChatCompletion.create(
+            model=self._model, messages=messages, temperature=0.0
+        )
         # Expect the model to respond with a float in [0,1]
         try:
             score = float(resp.choices[0].message["content"].strip())
@@ -86,7 +89,9 @@ class HFJudge(BaseJudge):  # noqa: D101
         try:
             from transformers import pipeline  # type: ignore
         except ModuleNotFoundError as exc:  # pragma: no cover
-            raise RuntimeError("transformers package not installed – install or use MockJudge") from exc
+            raise RuntimeError(
+                "transformers package not installed – install or use MockJudge"
+            ) from exc
         kwargs = {"model": model, "device": device} if device is not None else {"model": model}
         self._pipe = pipeline("text-generation", **kwargs)
 
@@ -122,6 +127,7 @@ class MockJudge(BaseJudge):  # noqa: D101
 # ---------------------------------------------------------------------------
 # Aggregation / Voting
 # ---------------------------------------------------------------------------
+
 
 def aggregate_scores(results: List[MetricResult], policy: str = "mean") -> float:  # noqa: D401
     """Combine multiple judge scores into a single value.
@@ -168,6 +174,7 @@ def judge_ensemble(
 # ---------------------------------------------------------------------------
 # Factory helper
 # ---------------------------------------------------------------------------
+
 
 def make_judges(names: str | List[str]) -> List[BaseJudge]:  # noqa: D401
     """Instantiate judges from *names* string or list.

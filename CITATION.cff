@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: "If you use this library, please cite it as below."
+authors:
+  - name: "IntrinsicalAI"
+title: "geoIR: Geometric-Aware Retrieval Library"
+version: "0.1.0"
+date-released: 2024-01-01
+url: "https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2"

@@ -18,8 +18,7 @@ clean:
 	rm -rf .mypy_cache/
 	rm -rf .ruff_cache/
 
-summary:
-	python scripts/concat.py
+
 
 activate_env:
 	source .venv/bin/activate

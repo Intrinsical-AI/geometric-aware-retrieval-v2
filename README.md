@@ -67,6 +67,20 @@ cd geometric-aware-retrieval-v2
 pip install -e ".[dev,hf]"
 ```
 
+The library requires a working PyTorch installation. On systems without GPU
+support you can install the CPU build via:
+
+```bash
+pip install torch --index-url https://pypi.org/simple
+```
+
+### Dataset and Dry Run
+
+The file `dry_run_config.yaml` contains a minimal configuration used by
+the internal tests. It expects a small subset of the MSMARCO dataset placed
+under `data/msmarco-passage-v2-subset`.  You can modify the paths in the YAML
+to point to your own dataset for quick experiments.
+
 ## Quick Start
 
 ```python
@@ -114,7 +128,8 @@ See the `examples/` directory for more detailed usage:
 
 ## Citation
 
-If you use this library in your research, please cite:
+See `CITATION.cff` for a machine readable citation file. If you use this
+library in your research, please cite:
 
 ```bibtex
 @software{geoIR_2024,
