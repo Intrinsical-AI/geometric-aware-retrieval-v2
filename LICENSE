@@ -28,7 +28,7 @@ If you use this software in academic research, please cite:
 
 ```bibtex
 @software{geometric_aware_retrieval_2025,
-  title={Geometric-Aware Retrieval with Differentiable Soft-kNN},
+  title={Geometric-Aware Retrieval - Geometrical studies for IR improving},
   author={Intrinsical AI Research Team},
   year={2025},
   url={https://github.com/IntrinsicalAI/geometric-aware-retrieval-v2},
