@@ -49,9 +49,6 @@ hf = [
     "datasets>=2.19",
     "sentence-transformers",
 ]
-rust = [
-    # Placeholder for compiled bindings once available
-]
 dev = [
     "pytest>=8.2",
     "ruff>=0.4",

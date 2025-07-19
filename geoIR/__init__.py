@@ -14,14 +14,14 @@ High-level API examples
 >>> results = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
 >>> print(f"nDCG@10: {results['ndcg_10']:.3f}")
 """
+
 from importlib import import_module
 from types import ModuleType
 from typing import Literal
 
-from .core.registry import registry as _registry  # noqa: F401
-
 # Import retrieval to register the default encoder
 from . import retrieval  # noqa: F401
+from .core.registry import registry as _registry  # noqa: F401
 
 _Mode = Literal["dual", "mono"]
 
@@ -50,13 +50,13 @@ def load_encoder(name: str, mode: _Mode = "dual", **kwargs):
 
 def quick_experiment(
     model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-    dataset: str = "beir/fiqa", 
+    dataset: str = "beir/fiqa",
     k: int = 20,
     geometric: bool = True,
-    **kwargs
+    **kwargs,
 ) -> dict[str, float]:
     """One-liner for geometric retrieval experiments.
-    
+
     Parameters
     ----------
     model_name : str, default "sentence-transformers/all-MiniLM-L6-v2"
@@ -69,18 +69,18 @@ def quick_experiment(
         Enable geometric regularization (InfoNCE-geo + curvature).
     **kwargs
         Additional trainer configuration parameters.
-        
+
     Returns
     -------
     dict[str, float]
         Evaluation metrics including nDCG@10, MAP, etc.
-        
+
     Examples
     --------
     >>> import geoIR as gi
     >>> results = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
     >>> print(f"nDCG@10: {results['ndcg_10']:.3f}")
-    
+
     >>> # Classic baseline comparison
     >>> classic = gi.quick_experiment("bge-base", "beir/fiqa", geometric=False)
     >>> geo = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
@@ -89,7 +89,7 @@ def quick_experiment(
     """
     from .core.config import ExperimentConfig, TrainerConfig
     from .training.trainer import Trainer
-    
+
     # Build configuration
     trainer_config = TrainerConfig(
         k_graph=k,
@@ -98,33 +98,50 @@ def quick_experiment(
         lambda_forman=0.05 if geometric else 0.0,
         epochs=1,  # Quick experiment
         verbose=True,
-        **kwargs
+        **kwargs,
     )
-    
-    config = ExperimentConfig(
-        dataset=dataset,
-        trainer=trainer_config
-    )
+
+    config = ExperimentConfig(dataset=dataset, trainer=trainer_config)
     config.encoder.model_name = model_name
-    
-    # Initialize and run
+
+    # Initialize encoder and trainer
     encoder = load_encoder(model_name, mode="dual")
     trainer = Trainer(encoder, config.trainer)
-    
-    # For quick experiments, we'll return mock results for now
-    # TODO: Implement actual training and evaluation pipeline
-    import warnings
-    warnings.warn(
-        "quick_experiment() is a prototype. Returning mock results. "
-        "Use scripts/finetune.py for full experiments.",
-        UserWarning
+
+    # ------------------------------------------------------------------
+    # Load a tiny corpus and create synthetic triplets for demonstration
+    # ------------------------------------------------------------------
+    from .data.loader import load_corpus
+
+    corpus = load_corpus(dataset)
+    if len(corpus) < 3:
+        raise ValueError("Dataset must contain at least three documents")
+
+    triplets = [
+        (corpus[i], corpus[(i + 1) % len(corpus)], corpus[(i + 2) % len(corpus)])
+        for i in range(min(len(corpus) - 2, 10))
+    ]
+
+    trainer.train(triplets)
+
+    index = encoder.build_index(corpus, k=k)
+
+    query_emb = encoder.encode(corpus, is_query=True)
+    from .eval.metrics import evaluate_retrieval
+
+    qrels = {str(i): {str(i): 1} for i in range(len(corpus))}
+    ndcg, recall = evaluate_retrieval(
+        query_emb,
+        index.embeddings,
+        qrels,
+        [str(i) for i in range(len(corpus))],
+        k_eval=10,
     )
-    
+
     return {
-        "ndcg_10": 0.456,  # Mock result
-        "map": 0.234,
-        "recall_100": 0.789,
-        "config": config.dict()
+        "ndcg_10": ndcg,
+        "recall_10": recall,
+        "config": config.dict(),
     }
 
 

@@ -67,6 +67,11 @@ cd geometric-aware-retrieval-v2
 pip install -e ".[dev,hf]"
 ```
 
+The extras `hf` and `viz` enable HuggingFace integration and plotting tools.
+Unit tests and most examples require PyTorch, which is included in the default
+installation of the `dev` extra. Install only the base package if you simply
+need the lightweight geometric utilities.
+
 ## Quick Start
 
 ```python
@@ -99,7 +104,7 @@ This repository includes a `Makefile` with the following commands:
 
 - `make lint`: Format and lint the code.
 - `make type`: Run the type checker.
-- `make test`: Run the unit tests.
+- `make test`: Run the unit tests (requires PyTorch).
 - `make clean`: Remove temporary files.
 
 ## Examples
@@ -111,6 +116,10 @@ See the `examples/` directory for more detailed usage:
 - `quick_experiment_cli.py`: Shows how to use the command-line interface for experiments.
 - `differentiable_demo.py`: A demonstration of the differentiable retrieval pipeline.
 - `fixed_demo.py`: A demonstration of the fixed retrieval pipeline.
+
+The file `dry_run_config.yaml` provides a minimal configuration that can be
+passed to `geoIR.quick_experiment` for a quick sanity check of the training and
+evaluation pipeline.
 
 ## Citation
 
@@ -126,6 +135,9 @@ If you use this library in your research, please cite:
   howpublished = {\\url{https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2}}
 }
 ```
+
+A machine-readable `CITATION.cff` file is included for use with GitHub's
+citation feature.
 
 ## License
 

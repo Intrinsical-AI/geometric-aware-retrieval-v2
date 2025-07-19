@@ -7,19 +7,21 @@ set of *ground-truth* documents, as judged by an LLM ensemble.
 
 This metric helps quantify if a retriever finds useful (but unlabelled) information.
 """
+
 from __future__ import annotations
 
 from typing import List
 
 from geoIR.eval.judges import BaseJudge, judge_ensemble
-from geoIR.geo.metrics import MetricResult
+
+from .metrics import MetricResult
 
 
 def SUD(
     query: str,
     gt_docs: List[str],
     new_docs: List[str],
-    *, 
+    *,
     judges: List[BaseJudge] | None = None,
     policy: str = "mean",
 ) -> MetricResult:  # noqa: D401

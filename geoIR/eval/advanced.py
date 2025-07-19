@@ -14,13 +14,14 @@ Metrics implemented
 All metrics return the common ``MetricResult`` dataclass so they can be mixed
 and aggregated with RARE and SUD.
 """
+
 from __future__ import annotations
 
 from itertools import combinations
 from statistics import mean
 from typing import List, Sequence
 
-from geoIR.geo.metrics import MetricResult
+from .metrics import MetricResult
 
 __all__ = [
     "non_monotonicity_score",
@@ -32,6 +33,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 # 1. Non-Monotonicity Score
 # ---------------------------------------------------------------------------
+
 
 def non_monotonicity_score(recalls: Sequence[float], qualities: Sequence[float]) -> MetricResult:  # noqa: D401
     """Compute how often *lower* recall leads to *higher* answer quality.
@@ -49,17 +51,20 @@ def non_monotonicity_score(recalls: Sequence[float], qualities: Sequence[float])
     assert len(recalls) == len(qualities), "recall/quality length mismatch"
     n_pairs = 0
     violations = 0
-    for (i, j) in combinations(range(len(recalls)), 2):
+    for i, j in combinations(range(len(recalls)), 2):
         n_pairs += 1
         if recalls[i] < recalls[j] and qualities[i] > qualities[j]:
             violations += 1
     score = violations / n_pairs if n_pairs else 0.0
-    return MetricResult(name="NMS", score=float(score), details={"violations": violations, "pairs": n_pairs})
+    return MetricResult(
+        name="NMS", score=float(score), details={"violations": violations, "pairs": n_pairs}
+    )
 
 
 # ---------------------------------------------------------------------------
 # 2. Meta-Evaluation
 # ---------------------------------------------------------------------------
+
 
 def meta_evaluation(judgments: Sequence[MetricResult]) -> MetricResult:  # noqa: D401
     """Aggregate a list of *judge* results (e.g. from LLM-as-a-judge).

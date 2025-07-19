@@ -3,6 +3,7 @@
 Prototype: uses simple ROUGE-L overlap between generated answer and reference.
 LLM-as-a-judge integration to come.
 """
+
 from __future__ import annotations
 
 from typing import List
@@ -14,7 +15,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     rouge_scorer = None
 
-from geoIR.geo.metrics import MetricResult
+from .metrics import MetricResult
 
 
 def RARE(query: str, docs: List[str], reference: str | None = None) -> MetricResult:  # noqa: D401
@@ -27,7 +28,9 @@ def RARE(query: str, docs: List[str], reference: str | None = None) -> MetricRes
         return res
     # --- reference-based scoring branch ---
     if rouge_scorer is None:
-        score = float(len(set(answer.split()) & set(reference.split())) / max(1, len(reference.split())))
+        score = float(
+            len(set(answer.split()) & set(reference.split())) / max(1, len(reference.split()))
+        )
     else:
         scorer = rouge_scorer.RougeScorer(["rougeL"], use_stemmer=True)
         score = scorer.score(reference, answer)["rougeL"].fmeasure
