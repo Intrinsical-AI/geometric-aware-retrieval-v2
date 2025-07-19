@@ -1,21 +1,4 @@
-# Geometric-Aware Retrieval (geoIR)
-
-This repository provides a Python framework for fine-tuning and evaluating sentence embedding models using geometric regularization techniques. The core idea is to represent the embedding space as a manifold and use its curvature properties to improve retrieval performance, especially for queries requiring nuanced understanding.
-
-The main contributions are:
-- **InfoNCE-Geo Loss**: A contrastive loss function that operates on geodesic distances over a k-NN graph of document embeddings.
-- **Geometric Regularization**: Using Ricci and Forman curvature as regularizers to encourage a more structured embedding space.
-- **High-Level API**: A simple `GeometricRetriever` class for easy indexing and searching.
-
-## Installation
-
-To install the necessary dependencies, clone the repository and install it in editable mode:
-
-```bash
-git clone https://github.com/your-username/geometric-aware-retrieval-v2.git
-cd geometric-aware-retrieval-v2
-pip install -e .
-```
+# Geometric-Aware Retrieval with Differentiable Soft-kNN
 
 ## Quick Start
 
@@ -60,34 +43,11 @@ for i, doc_idx in enumerate(cosine_results):
     print(f"{i+1}: {corpus[doc_idx]} (doc_id={doc_idx})")
 ```
 
-## Fine-tuning a Model
 
-You can fine-tune your own models using the unified training script. Configuration is handled via YAML files.
+## Usage Examples
 
-1.  **Create a configuration file** (e.g., `my_experiment.yaml`):
+### 1. Fine-tuning a Model
 
-    ```yaml
-    # my_experiment.yaml
-    dataset: "/path/to/your/triplets.tsv" # Or path to a corpus file
-    trainer: "geo" # or "classic"
+You can fine-tune your own models using the trainer
 
-    encoder:
-      model_name: "sentence-transformers/all-MiniLM-L6-v2"
-
-    geo_params:
-      epochs: 5
-      batch_size: 8
-      lr: 1e-5
-      k_graph: 5
-      lambda_ricci: 0.5
-
-    output_dir: "runs/my_first_experiment"
-    ```
-
-2.  **Run the fine-tuning script**:
-
-    ```bash
-    python -m geoIR.scripts.finetune --config my_experiment.yaml
-    ```
-
-The trained model checkpoint and logs will be saved in the specified `output_dir`.
+### 2. IR metrics - RARE, SUD, non_monotonicity

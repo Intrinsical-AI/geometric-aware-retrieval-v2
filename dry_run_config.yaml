@@ -1,0 +1,10 @@
+# Example configuration for a dry run to test the fine-tuning script.
+# This uses the default classic trainer settings.
+dataset: "msmarco-passage-v2-subset"
+dry_run: true
+output_dir: "runs/dry_run"
+
+trainer:
+  epochs: 1
+  batch_size: 2
+  verbose: true

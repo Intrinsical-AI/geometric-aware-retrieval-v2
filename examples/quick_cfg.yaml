@@ -1,0 +1,11 @@
+# Minimal quick config for CI / dry-run
+model: sentence-transformers/all-MiniLM-L6-v2
+# Path to a plain-text corpus (one doc per line). We point to examples/dummy_docs.txt
+dataset: examples/dummy_docs.txt
+graph_k: 10
+distance: cosine
+batch_size: 8
+epochs: 1
+lr: 1e-5
+top_k: 10
+subset_docs: 50
