@@ -1,0 +1,14 @@
+\section{Metodología}
+Nuestra metodología se basa en cuatro componentes principales:
+
+\subsection{El espacio latente como variedad maleable}
+Imagina que cada consulta y cada documento no viven en un espacio plano, sino sobre una \textbf{superficie curva} (una variedad riemanniana) que el modelo \textbf{aprende a deformar}. Esa deformación es tu función $\phi$.
+
+\subsection{Métrica inducida y geodésicas}
+Junto a $\phi$ nace una \textbf{métrica local} $g(x)$ (del jacobiano de $\phi$) que dicta \textbf{cómo medir distancias} en cada punto. Las verdaderas “distancias semánticas” son las \textbf{geodésicas} sobre esa superficie.
+
+\subsection{Pérdida contrastiva geométrica}
+En lugar de usar InfoNCE con similitud de coseno, aplicamos \textbf{InfoNCE-geo}, que compara anclas, positivos y negativos \textbf{según su distancia geodésica} $d_g$. Con ello enseñamos al encoder a respetar la curvatura relevante para la tarea.
+
+\subsection{Regularización de curvatura}
+Incorporamos un término suave ($\mathcal L_{Ricci}$ u opcionalmente $\mathcal L_{Forman}$) que \textbf{penaliza las regiones de curvatura negativa excesiva}, empujando tu espacio a consolidarse en zonas “bien conectadas” y aplanarse donde interese.
