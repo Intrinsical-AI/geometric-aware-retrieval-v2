@@ -19,12 +19,10 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "numpy>=1.23",
+    "numpy>=1.23,<2",
     "scipy>=1.11",
     "torch>=2.1",
-    "transformers>=4.41",
     "faiss-cpu>=1.7.4",
-    "numpy>=1.23,<2",
     "networkx>=3.2",
     "numba>=0.58",
     "pydantic-settings>=2.1",
@@ -32,7 +30,9 @@ dependencies = [
     "click>=8.1",
     "typer>=0.12",
     "rouge-score>=0.1.2",
-    "datasets>=2.19",
+    "pandas",
+    "PyYAML",
+    "scikit-learn",
 ]
 
 [project.optional-dependencies]
@@ -41,21 +41,24 @@ viz = [
     "plotly>=5.20",
     "dash>=2.16",
     "umap-learn>=0.5",
+    "matplotlib",
+    "seaborn",
 ]
 hf = [
     "transformers>=4.41",
     "datasets>=2.19",
+    "sentence-transformers",
 ]
 rust = [
     # Placeholder for compiled bindings once available
 ]
-
 dev = [
     "pytest>=8.2",
     "ruff>=0.4",
     "black>=24.4",
     "mypy>=1.10",
-    "ipykernel>=6.29"
+    "ipykernel>=6.29",
+    "beir",
 ]
 
 [project.scripts]
