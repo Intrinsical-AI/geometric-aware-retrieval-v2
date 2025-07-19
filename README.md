@@ -4,192 +4,129 @@ A Python library for geometric-aware information retrieval using differentiable 
 
 ## Features
 
-- **Geometric Retrieval**: Leverage graph-based distances for more semantically meaningful similarity search
-- **Differentiable Pipeline**: End-to-end trainable retrieval models
-- **Multiple Backends**: Supports FAISS for fast similarity search
-- **Pre-trained Models**: Easy integration with HuggingFace's sentence-transformers
-- **Evaluation**: Built-in support for standard IR metrics and geometric metrics (RARE, SUD)
+- **Geometric-Aware Retrieval**: Utilizes graph-based distances to capture semantic relationships, leading to more meaningful search results.
+- **Differentiable Pipeline**: The entire retrieval process is end-to-end trainable, allowing for fine-tuning and optimization.
+- **Multiple Backends**: Supports FAISS for efficient similarity search, with the flexibility to integrate other backends.
+- **Pre-trained Models**: Seamlessly integrates with HuggingFace's `sentence-transformers` for access to a wide range of pre-trained models.
+- **Comprehensive Evaluation**: Includes built-in support for standard information retrieval metrics (e.g., MAP, NDCG) and novel geometric metrics (e.g., RARE, SUD).
+- **Modular Design**: The library is organized into distinct modules for easy extension and customization.
+
+## Modules
+
+### `geoIR.core`
+
+The core module provides the foundational components of the library, including configuration management and the main runner for experiments.
+
+- `config.py`: Defines the data structures for configuring experiments using Pydantic.
+- `runner.py`: The main entry point for running experiments.
+
+### `geoIR.data`
+
+The data module handles loading and preprocessing of datasets.
+
+- `loaders.py`: Contains functions for loading various datasets, including those from the BEIR benchmark.
+
+### `geoIR.eval`
+
+The evaluation module provides tools for assessing the performance of retrieval models.
+
+- `metrics.py`: Implements standard information retrieval metrics.
+- `rare.py`: Implements the RARE (Retrieval-Augmented ROUGE) metric.
+- `sud.py`: Implements the SUD (Semantic Uniqueness and Diversity) metric.
+
+### `geoIR.geo`
+
+The geo module contains the core geometric components of the library.
+
+- `curvature.py`: Implements functions for computing graph curvature.
+- `differentiable.py`: Contains the implementation of the differentiable soft-kNN.
+- `graph.py`: Provides functions for building and manipulating k-NN graphs.
+
+### `geoIR.retrieval`
+
+The retrieval module contains the main classes for performing retrieval.
+
+- `retriever.py`: The high-level `GeometricRetriever` class for end-to-end retrieval.
+- `encoder.py`: The `Encoder` class for encoding text into embeddings.
+- `index.py`: The `Index` class for building and searching the index.
+
+### `geoIR.training`
+
+The training module provides the tools for training and fine-tuning retrieval models.
+
+- `trainer.py`: The `Trainer` class for managing the training process.
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/geometric-aware-retrieval-v2.git
+git clone https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2.git
 cd geometric-aware-retrieval-v2
 
-# Install with pip
-pip install -e .
+# Install with pip for development
+pip install -e ".[dev,hf]"
 ```
 
 ## Quick Start
 
-### Basic Usage
-
 ```python
-from geoIR.retrieval.retriever import GeometricRetriever
+import geoIR as gi
 
-# Initialize with a pre-trained model
-retriever = GeometricRetriever("sentence-transformers/all-MiniLM-L6-v2")
+# 1. Load an encoder
+encoder = gi.load_encoder("sentence-transformers/all-MiniLM-L6-v2")
 
-# Index documents
+# 2. Define a corpus and build the index
 corpus = [
-    "A man is eating food.",
-    "A man is eating a piece of bread.",
-    "The girl is carrying a baby.",
-    "A man is riding a horse.",
-    "A woman is playing violin.",
-    "A man is riding a white horse on an enclosed track.",
+    "The Moon is a natural satellite of Earth.",
+    "Mars is often called the Red Planet.",
+    "A solar eclipse occurs when the Moon passes between Earth and the Sun.",
 ]
+index = encoder.build_index(corpus, k=2)
 
-retriever.index(corpus, k_graph=3)
+# 3. Search the index
+query_emb = encoder.encode(["Which planet is red?"])[0]
+doc_indices = index.search(query_emb, k=1)
 
-# Search with geodesic distance
-results = retriever.search("A man is riding an animal.", top_k=3, metric="geodesic")
+# 4. Geometrical audit
+audit = index.geo_audit(curvature=True)
+print(audit.curvature)
+
 ```
 
-### Advanced Usage
+## Makefile Commands
 
-#### Custom Indexing
+This repository includes a `Makefile` with the following commands:
 
-```python
-from geoIR.retrieval.encoder import load_encoder
-from geoIR.retrieval.index import Index
-
-# Load a custom encoder
-encoder = load_encoder("sentence-transformers/all-mpnet-base-v2", device="cuda")
-
-# Encode documents
-embeddings = encoder.encode(corpus)
-
-# Build custom index
-index = Index(k=10, metric="cosine")
-index.build(embeddings)
-
-# Save and load
-index.save("my_index.pkl")
-loaded_index = Index.load("my_index.pkl")
-```
-
-#### Fine-tuning
-
-```python
-from geoIR.training.trainer import Trainer
-from geoIR.data.loaders import load_beir_dataset
-
-# Load dataset
-train_loader, val_loader = load_beir_dataset("msmarco")
-
-# Initialize trainer
-trainer = Trainer(
-    model_name="sentence-transformers/all-MiniLM-L6-v2",
-    train_loader=train_loader,
-    val_loader=val_loader,
-    output_dir="runs/experiment_1"
-)
-
-# Start training
-trainer.train(epochs=10, learning_rate=2e-5)
-```
-
-## API Reference
-
-### Core Classes
-
-#### `GeometricRetriever`
-
-Main class for end-to-end retrieval.
-
-```python
-retriever = GeometricRetriever(
-    model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-    device: Optional[str] = None
-)
-```
-
-**Methods**:
-- `index(documents: List[str], k_graph: int = 10, **kwargs) -> None`: Index documents
-- `search(query: str, top_k: int = 10, metric: str = "geodesic") -> List[int]`: Search documents
-- `save(path: str) -> None`: Save retriever state
-- `load(path: str) -> 'GeometricRetriever'`: Load retriever state
-
-#### `Index`
-
-Low-level index for similarity search.
-
-```python
-index = Index(
-    k: int = 10,
-    metric: str = "cosine",
-    **kwargs
-)
-```
-
-**Methods**:
-- `build(embeddings: np.ndarray) -> None`: Build index from embeddings
-- `search(query: np.ndarray, k: int = 10) -> Tuple[np.ndarray, np.ndarray]`: Search index
-- `save(path: str) -> None`: Save index
-- `load(path: str) -> 'Index'`: Load index
-
-## Evaluation
-
-### Standard IR Metrics
-
-```python
-from geoIR.eval.metrics import evaluate_retrieval
-
-results = evaluate_retrieval(
-    query_embeddings,  # [n_queries, dim]
-    doc_embeddings,    # [n_docs, dim]
-    qrels,             # Dict[query_id, Dict[doc_id, relevance]]
-    metrics=["map", "ndcg@10", "recall@100"]
-)
-```
-
-### Geometric Metrics
-
-```python
-from geoIR.eval.rare import RARE
-from geoIR.eval.sud import SUD
-
-# Example usage of RARE
-rare_result = RARE(
-    query="What is the capital of France?",
-    docs=["Paris is the capital of France.", "France is a country in Europe."],
-    reference="The capital of France is Paris."  # optional
-)
-
-# Example usage of SUD
-sud_result = SUD(
-    query="What are the effects of climate change?",
-    gt_docs=["Climate change causes rising sea levels."],  # ground-truth docs
-    new_docs=["More CO2 increase extreme weather events."]  # new docs to evaluate
-)
-```
+- `make lint`: Format and lint the code.
+- `make type`: Run the type checker.
+- `make test`: Run the unit tests.
+- `make clean`: Remove temporary files.
 
 ## Examples
 
 See the `examples/` directory for more detailed usage:
 
-- `basic_usage.py`: Basic retrieval pipeline
-- `quickstart.py`: Quick start guide
-- `quick_experiment_cli.py`: Command-line interface for experiments
-- `differentiable_demo.py`: Differentiable retrieval demo
+- `basic_usage.py`: Demonstrates the basic retrieval pipeline.
+- `quickstart.py`: A quick start guide to the library.
+- `quick_experiment_cli.py`: Shows how to use the command-line interface for experiments.
+- `differentiable_demo.py`: A demonstration of the differentiable retrieval pipeline.
+- `fixed_demo.py`: A demonstration of the fixed retrieval pipeline.
 
 ## Citation
 
 If you use this library in your research, please cite:
 
 ```bibtex
-@software{geometric_ir_2023,
-  author = {Pablo Pintor},
-  title = {Geometric-Aware Retrieval},
-  year = {2023},
+@software{geoIR_2024,
+  author = {IntrinsicalAI},
+  title = {geoIR: A Python library for geometric-aware information retrieval},
+  year = {2024},
   publisher = {GitHub},
-  journal = {https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2},
-  howpublished = {\url{https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2}}
+  journal = {GitHub repository},
+  howpublished = {\\url{https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2}}
 }
 ```
 
 ## License
 
-MIT
+Apache-2.0
