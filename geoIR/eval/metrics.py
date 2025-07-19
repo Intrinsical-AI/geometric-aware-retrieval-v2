@@ -1,11 +1,22 @@
 """Standard retrieval evaluation metrics."""
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
+from dataclasses import dataclass, field
 
 import numpy as np
 import pytrec_eval
 import torch
 from sentence_transformers import util as st_util
 from geoIR.geo.graph_rerank import personalized_pagerank
+
+
+@dataclass
+class MetricResult:  # noqa: D101
+    name: str
+    score: float
+    details: dict[str, Any] = field(default_factory=dict)
+
+    def __repr__(self) -> str:  # pragma: no cover
+        return f"{self.name}(score={self.score:.3f})"
 
 
 def evaluate_retrieval(
