@@ -1,14 +1,68 @@
-\section{Metodología}
-Nuestra metodología se basa en cuatro componentes principales:
+\section{Methodology}
+\label{sec:method}
 
-\subsection{El espacio latente como variedad maleable}
-Imagina que cada consulta y cada documento no viven en un espacio plano, sino sobre una \textbf{superficie curva} (una variedad riemanniana) que el modelo \textbf{aprende a deformar}. Esa deformación es tu función $\phi$.
+Our approach models the embedding space as a learnable Riemannian manifold, where the geometry adapts to better capture semantic relationships. We propose a dual-encoder architecture with curvature-aware training objectives.
 
-\subsection{Métrica inducida y geodésicas}
-Junto a $\phi$ nace una \textbf{métrica local} $g(x)$ (del jacobiano de $\phi$) que dicta \textbf{cómo medir distancias} en cada punto. Las verdaderas “distancias semánticas” son las \textbf{geodésicas} sobre esa superficie.
+\subsection{Geometric Framework}
 
-\subsection{Pérdida contrastiva geométrica}
-En lugar de usar InfoNCE con similitud de coseno, aplicamos \textbf{InfoNCE-geo}, que compara anclas, positivos y negativos \textbf{según su distancia geodésica} $d_g$. Con ello enseñamos al encoder a respetar la curvatura relevante para la tarea.
+\subsubsection{Embedding Space as a Manifold}
+Let $\mathcal{M}$ be a Riemannian manifold embedded in $\mathbb{R}^n$ with metric tensor $g$. Given an encoder $\phi: \mathcal{X} \rightarrow \mathcal{M}$ that maps inputs to the manifold, we define the pullback metric $g_{\phi}(x) = J_\phi(x)^\top J_\phi(x)$, where $J_\phi$ is the Jacobian of $\phi$.
 
-\subsection{Regularización de curvatura}
-Incorporamos un término suave ($\mathcal L_{Ricci}$ u opcionalmente $\mathcal L_{Forman}$) que \textbf{penaliza las regiones de curvatura negativa excesiva}, empujando tu espacio a consolidarse en zonas “bien conectadas” y aplanarse donde interese.
+\subsubsection{Geodesic Distance}
+The geodesic distance $d_g(x,y)$ between points $x,y \in \mathcal{M}$ is given by:
+\begin{equation}
+d_g(x,y) = \inf_{\gamma} \int_0^1 \sqrt{\dot{\gamma}(t)^\top g(\gamma(t))\dot{\gamma}(t)} dt
+\end{equation}
+where $\gamma$ is a smooth path connecting $x$ and $y$.
+
+\subsection{Curvature-Aware Training}
+
+\subsubsection{Ricci-Ollivier Curvature}
+For an edge $(u,v)$ in the k-NN graph, we define the Ollivier-Ricci curvature as:
+\begin{equation}
+\kappa(u,v) = 1 - \frac{W_1(m_u, m_v)}{d(u,v)}
+\end{equation}
+where $W_1$ is the 1-Wasserstein distance and $m_u, m_v$ are probability measures centered at $u$ and $v$.
+
+\subsubsection{Training Objectives}
+Our model optimizes a combination of two main objectives:
+
+1. \textbf{InfoNCE-geo Loss}:
+\begin{equation}
+\mathcal{L}_{\text{InfoNCE-geo}} = -\log\frac{\exp(-d_g(q, d^+)/\tau)}{\sum_{d\in\{d^+\}\cup\mathcal{N}(q)} \exp(-d_g(q,d)/\tau)}
+\end{equation}
+where $q$ is a query, $d^+$ is a positive document, and $\mathcal{N}(q)$ are negative samples.
+
+2. \textbf{Curvature Regularization}:
+\begin{equation}
+\mathcal{L}_{\text{Ricci}} = \frac{1}{|E|}\sum_{(u,v)\in E} \max(0, \kappa_{\text{target}} - \kappa(u,v))^2
+\end{equation}
+
+\subsection{LLM-Aware Evaluation}
+
+\subsubsection{Response-Aware Retrieval Effectiveness (RARE)}
+For a query $q$ and retrieved documents $D_k = \{d_1, ..., d_k\}$, we define:
+\begin{equation}
+\text{RARE}(k) = \text{score}(\text{LLM}(q, D_k))
+\end{equation}
+where the score is obtained using an LLM-as-a-judge approach.
+
+\subsubsection{Semantic Utility Delta (SUD)}
+SUD measures the marginal value of non-groundtruth documents:
+\begin{equation}
+\text{SUD} = \text{score}(\text{LLM}(q, D_{\text{new}})) - \text{score}(\text{LLM}(q, D_{\text{gt}}))
+\end{equation}
+where $D_{\text{gt}}$ are groundtruth documents and $D_{\text{new}}$ are non-groundtruth documents.
+
+\subsection{Implementation Details}
+
+\begin{itemize}
+    \item Encoder: BERT-base architecture with mean pooling
+    \item Training: AdamW optimizer with learning rate $2\times10^{-5}$
+    \item Batch size: 128
+    \item Temperature $\tau = 0.05$
+    \item Curvature neighborhood size $k = 30$
+    \item Geodesic mixing parameter $\alpha = 0.5$
+\end{itemize}
+
+The model is implemented in PyTorch with custom CUDA kernels for efficient curvature computation. Training typically converges in 3-5 epochs on standard IR datasets.

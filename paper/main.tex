@@ -1,36 +1,48 @@
-\documentclass[12pt, a4paper]{article}
+\documentclass[conference]{IEEEtran}
+\usepackage{preambulo}
 
-% Preámbulo (configuraciones, paquetes, etc.)
-\input{preambulo.tex}
-
-\title{El Espacio Latente como Variedad Deformable para la Recuperación de Información}
-\author{Pablo Pintor}
-\date{\today}
+\title{Curvature-Regularised Retrieval Embeddings with LLM-Aware Evaluation}
+\author{
+    \IEEEauthorblockN{Pablo Pintor}
+    \IEEEauthorblockA{Affiliation\\
+    Email: pablo.pintor@institution.edu}
+}
 
 \begin{document}
-
 \maketitle
 
 \begin{abstract}
     \input{secciones/resumen.tex}
 \end{abstract}
 
-\tableofcontents
-\newpage
+\begin{IEEEkeywords}
+    Information Retrieval, Geometric Deep Learning, Manifold Learning, Large Language Models, Dense Retrieval
+\end{IEEEkeywords}
 
-% Secciones del paper
+\section{Introduction}
 \input{secciones/introduccion.tex}
+
+\section{Related Work}
 \input{secciones/sota.tex}
+
+\section{Methodology}
 \input{secciones/metodologia.tex}
+
+\section{Experiments}
 \input{secciones/experimentos.tex}
+
+\section{Results}
 \input{secciones/resultados.tex}
+
+\section{Conclusion}
 \input{secciones/conclusion.tex}
 
-% Bibliografía
-\bibliographystyle{alpha}
+\section*{Acknowledgment}
+This work was supported by...
+
+\bibliographystyle{IEEEtran}
 \bibliography{bibliografia/referencias}
 
-% Apéndices
 \appendix
 \input{apendices/apendice_a.tex}
 

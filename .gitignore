@@ -176,6 +176,7 @@ celerybeat.pid
 # ===================
 # Add any additional project-specific ignores below this line
 # examples/
+*/FEEDBACK.md
 out/
 concat.py
 concatenated_code.py
