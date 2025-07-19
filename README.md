@@ -148,11 +148,22 @@ results = evaluate_retrieval(
 ### Geometric Metrics
 
 ```python
-from geoIR.eval.rare import compute_rare
-from geoIR.eval.sud import compute_sud
+from geoIR.eval.rare import RARE
+from geoIR.eval.sud import SUD
 
-rare_score = compute_rare(index, k=10)
-sud_score = compute_sud(index, k=10)
+# Example usage of RARE
+rare_result = RARE(
+    query="What is the capital of France?",
+    docs=["Paris is the capital of France.", "France is a country in Europe."],
+    reference="The capital of France is Paris."  # optional
+)
+
+# Example usage of SUD
+sud_result = SUD(
+    query="What are the effects of climate change?",
+    gt_docs=["Climate change causes rising sea levels."],  # ground-truth docs
+    new_docs=["More CO2 increase extreme weather events."]  # new docs to evaluate
+)
 ```
 
 ## Examples
@@ -170,12 +181,12 @@ If you use this library in your research, please cite:
 
 ```bibtex
 @software{geometric_ir_2023,
-  author = {Your Name},
+  author = {Pablo Pintor},
   title = {Geometric-Aware Retrieval},
   year = {2023},
   publisher = {GitHub},
-  journal = {GitHub repository},
-  howpublished = {\url{https://github.com/yourusername/geometric-aware-retrieval-v2}}
+  journal = {https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2},
+  howpublished = {\url{https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2}}
 }
 ```
 
