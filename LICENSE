@@ -1,0 +1,55 @@
+MIT License
+
+Copyright (c) 2025 Intrinsical AI - Geometric-Aware Retrieval Project
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Scientific Attribution
+
+If you use this software in academic research, please cite:
+
+```bibtex
+@software{geometric_aware_retrieval_2025,
+  title={Geometric-Aware Retrieval with Differentiable Soft-kNN},
+  author={Intrinsical AI Research Team},
+  year={2025},
+  url={https://github.com/IntrinsicalAI/geometric-aware-retrieval-v2},
+  note={Empirically validated differentiable graph construction with degree correction}
+}
+```
+
+## Research Contributions
+
+This software implements and validates:
+
+1. **Differentiable Soft-kNN with Degree Correction (τ-fix)**: A novel method for 
+   constructing differentiable k-nearest neighbor graphs with exact degree control.
+
+2. **Empirical Validation**: Comprehensive ablation studies demonstrating 8.7x speedup 
+   over traditional methods while maintaining perfect degree control.
+
+3. **Geometric-Aware Information Retrieval**: End-to-end differentiable pipeline for 
+   learning geometric representations in embedding spaces.
+
+For detailed scientific documentation, see:
+- `ABLATION_STUDY_REPORT.md` - Empirical validation results
+- `MATHEMATICAL_FOUNDATIONS.md` - Theoretical foundations
+- `REPRODUCIBILITY_CHECKLIST.md` - Complete reproduction guide

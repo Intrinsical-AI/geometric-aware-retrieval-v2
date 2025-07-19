@@ -1,0 +1,76 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "geoIR"
+version = "0.1.0"
+description = "Curvature-aware embedding & retrieval library"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  {name = "IntrinsicalAI", email = "contact@intrinsical.ai"},
+]
+license = {text = "Apache-2.0"}
+keywords = ["information-retrieval", "embeddings", "geometry", "ricci", "curvature", "rag"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy>=1.23",
+    "scipy>=1.11",
+    "torch>=2.1",
+    "transformers>=4.41",
+    "faiss-cpu>=1.7.4",
+    "numpy>=1.23,<2",
+    "networkx>=3.2",
+    "numba>=0.58",
+    "pydantic-settings>=2.1",
+    "tqdm>=4.66",
+    "click>=8.1",
+    "typer>=0.12",
+    "rouge-score>=0.1.2",
+    "datasets>=2.19",
+]
+
+[project.optional-dependencies]
+# Extras described in ARCH.md
+viz = [
+    "plotly>=5.20",
+    "dash>=2.16",
+    "umap-learn>=0.5",
+]
+hf = [
+    "transformers>=4.41",
+    "datasets>=2.19",
+]
+rust = [
+    # Placeholder for compiled bindings once available
+]
+
+dev = [
+    "pytest>=8.2",
+    "ruff>=0.4",
+    "black>=24.4",
+    "mypy>=1.10",
+    "ipykernel>=6.29"
+]
+
+[project.scripts]
+geoIR = "geoIR.cli:app"
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["tests*", "examples*"]
+
+[tool.ruff]
+select = ["E", "F", "I", "B"]
+line-length = 100
+
+[tool.black]
+line-length = 100
+
+[tool.pytest.ini_options]
+addopts = "-q"
