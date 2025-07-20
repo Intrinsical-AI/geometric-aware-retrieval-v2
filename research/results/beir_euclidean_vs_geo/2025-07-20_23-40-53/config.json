@@ -1,0 +1,11 @@
+{
+    "dataset": "fiqa",
+    "max_docs": 1000,
+    "max_queries": 100,
+    "k": 20,
+    "device": "cpu",
+    "rerank": "ppr",
+    "ppr_topk": 100,
+    "ppr_alpha": 0.2,
+    "seed": 42
+}
