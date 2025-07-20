@@ -175,14 +175,20 @@ celerybeat.pid
 # Project-specific
 # ===================
 # Add any additional project-specific ignores below this line
-# examples/
+
+# experiments/
+examples/
 */FEEDBACK.md
 out/
 concat.py
 concatenated_code.py
-experiments/
 embeddings/
 docs/
 datasets/
 plots/
 scripts/
+medium/
+tests/
+notebooks/
+outputs/
+paper/
