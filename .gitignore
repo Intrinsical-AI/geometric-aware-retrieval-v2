@@ -176,7 +176,7 @@ celerybeat.pid
 # ===================
 # Add any additional project-specific ignores below this line
 
-# experiments/
+experiments/
 examples/
 */FEEDBACK.md
 out/
@@ -192,3 +192,4 @@ tests/
 notebooks/
 outputs/
 paper/
+
