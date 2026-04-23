@@ -59,6 +59,7 @@ dev = [
     "mypy>=1.10",
     "ipykernel>=6.29",
     "beir",
+    "psutil>=7.2",
 ]
 
 [project.scripts]
