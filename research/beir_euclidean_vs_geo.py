@@ -9,6 +9,7 @@ surface. It supports:
 3. Stable per-run artifacts plus an aggregate summary derived only from
    ``config.json`` + ``beir_results.json`` pairs found under the results tree.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -420,7 +421,9 @@ def load_qrels(path: Path) -> dict[str, dict[str, int]]:
     return qrels
 
 
-def load_local_beir_dataset(dataset_path: Path, split: str = DEFAULT_SPLIT) -> tuple[
+def load_local_beir_dataset(
+    dataset_path: Path, split: str = DEFAULT_SPLIT
+) -> tuple[
     dict[str, dict[str, str]],
     dict[str, str],
     dict[str, dict[str, int]],
@@ -488,7 +491,12 @@ def subsample_dataset(
     kept_docs = {doc_id: corpus[doc_id] for doc_id in doc_ids}
     doc_id_set = set(doc_ids)
 
-    query_ids = deterministic_sample(list(queries.keys()), max_queries, seed + 1)
+    eligible_query_ids = [
+        query_id
+        for query_id in queries
+        if any(doc_id in doc_id_set for doc_id in qrels.get(query_id, {}))
+    ]
+    query_ids = deterministic_sample(eligible_query_ids, max_queries, seed + 1)
     kept_queries: dict[str, str] = {}
     kept_qrels: dict[str, dict[str, int]] = {}
     kept_query_ids: list[str] = []
@@ -497,9 +505,7 @@ def subsample_dataset(
         if query_id not in qrels:
             continue
         filtered_docs = {
-            doc_id: int(score)
-            for doc_id, score in qrels[query_id].items()
-            if doc_id in doc_id_set
+            doc_id: int(score) for doc_id, score in qrels[query_id].items() if doc_id in doc_id_set
         }
         if not filtered_docs:
             continue
@@ -867,10 +873,9 @@ def load_summary_record(run_dir: Path) -> dict[str, Any] | None:
     candidate = next((row for row in typed_rows if row.get("role") == RESULT_ROLE_CANDIDATE), None)
     if baseline is None or candidate is None:
         return None
-    if (
-        not SUMMARY_REQUIRED_RESULT_KEYS.issubset(baseline)
-        or not SUMMARY_REQUIRED_RESULT_KEYS.issubset(candidate)
-    ):
+    if not SUMMARY_REQUIRED_RESULT_KEYS.issubset(
+        baseline
+    ) or not SUMMARY_REQUIRED_RESULT_KEYS.issubset(candidate):
         return None
     if baseline.get("status") != RESULT_STATUS_OK or candidate.get("status") != RESULT_STATUS_OK:
         return None
@@ -1106,8 +1111,7 @@ def render_decision_gate(summary_df: pd.DataFrame) -> str:
             )
 
     ppr_rows = fiqa[
-        (fiqa["candidate_path_kind"] == "soft_ppr")
-        & (fiqa["max_docs"].isin([1000, 5000]))
+        (fiqa["candidate_path_kind"] == "soft_ppr") & (fiqa["max_docs"].isin([1000, 5000]))
     ]
     if ppr_rows.empty or len(set(ppr_rows["max_docs"])) < 2:
         lines.append("- PPR gate: pending; missing FiQA PPR runs for both 1k and 5k.")
@@ -1287,8 +1291,7 @@ class BeirExperimentRunner(ExperimentRunner):
             split=DEFAULT_SPLIT,
         )
         self.logger.info(
-            f"Subset sizes – Docs: {len(bundle.doc_ids):,}, "
-            f"Queries: {len(bundle.query_ids):,}"
+            f"Subset sizes – Docs: {len(bundle.doc_ids):,}, Queries: {len(bundle.query_ids):,}"
         )
         if not bundle.qrels:
             raise ValueError(

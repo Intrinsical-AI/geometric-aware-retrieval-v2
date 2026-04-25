@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """FiQA-first matrix runner for the BEIR benchmark pack."""
+
 from __future__ import annotations
 
 import argparse

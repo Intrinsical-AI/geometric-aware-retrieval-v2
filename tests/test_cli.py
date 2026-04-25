@@ -2,7 +2,6 @@ from typer.testing import CliRunner
 
 from geoIR.cli import app
 
-
 runner = CliRunner()
 
 

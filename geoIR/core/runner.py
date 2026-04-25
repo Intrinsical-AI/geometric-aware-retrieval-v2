@@ -25,8 +25,8 @@ class ExperimentRunner(abc.ABC):
         """
         self.experiment_name = experiment_name
         self.base_output_dir = Path(base_output_dir)
-        self.run_dir: Path = None
-        self.logger: logging.Logger = None
+        self.run_dir: Path | None = None
+        self.logger: logging.Logger | None = None
         self.config: Dict[str, Any] = {}
 
     def _setup_run_environment(self):
@@ -68,15 +68,19 @@ class ExperimentRunner(abc.ABC):
 
         config_dict = {}
         if is_dataclass(config):
-            config_dict = asdict(config)
+            config_dict = asdict(config)  # type: ignore[arg-type]
         elif isinstance(config, dict):
             config_dict = config
         else:
+            if self.logger is None:
+                raise RuntimeError("Logger has not been initialised.")
             self.logger.warning("Configuration is not a dataclass or dict; saving as string.")
             config_dict = {"config": str(config)}
 
         with open(config_path, "w") as f:
             json.dump(config_dict, f, indent=4)
+        if self.logger is None:
+            raise RuntimeError("Logger has not been initialised.")
         self.logger.info(f"Configuration saved to {config_path}")
 
     @abc.abstractmethod
@@ -88,7 +92,7 @@ class ExperimentRunner(abc.ABC):
         """Entry point to start the experiment."""
         # Store configuration internally
         if is_dataclass(config):
-            self.config = asdict(config)
+            self.config = asdict(config)  # type: ignore[arg-type]
         elif isinstance(config, dict):
             self.config = config
         else:
@@ -102,9 +106,13 @@ class ExperimentRunner(abc.ABC):
             # Run the main experiment logic
             self.run()
         except Exception as e:
+            if self.logger is None:
+                raise
             self.logger.error("Experiment failed with an exception.", exc_info=True)
             raise e
 
+        if self.logger is None:
+            raise RuntimeError("Logger has not been initialised.")
         self.logger.info("Experiment finished successfully.")
 
     def save_results(self, results: list[dict], filename: str) -> Path:
@@ -115,6 +123,8 @@ class ExperimentRunner(abc.ABC):
         path = self.run_dir / filename
         with open(path, "w") as f:
             json.dump(results, f, indent=2)
+        if self.logger is None:
+            raise RuntimeError("Logger has not been initialised.")
         self.logger.info(f"Results saved to {path}")
         return path
 
@@ -125,5 +135,7 @@ class ExperimentRunner(abc.ABC):
 
         path = self.run_dir / filename
         df.to_csv(path, index=False)
+        if self.logger is None:
+            raise RuntimeError("Logger has not been initialised.")
         self.logger.info(f"DataFrame saved to {path}")
         return path

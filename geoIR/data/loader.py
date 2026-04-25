@@ -6,6 +6,7 @@ import warnings
 from pathlib import Path
 from typing import List, Tuple
 
+
 def load_triplets(path: str) -> List[Tuple[str, str, str]]:
     """
     Load training triplets from a TSV file.
@@ -13,7 +14,7 @@ def load_triplets(path: str) -> List[Tuple[str, str, str]]:
     """
     file_path = Path(path)
     if not file_path.exists():
-        warnings.warn(f"Triplet file not found: {path}. Returning empty list.")
+        warnings.warn(f"Triplet file not found: {path}. Returning empty list.", stacklevel=2)
         return []
 
     triplets = []
@@ -24,13 +25,14 @@ def load_triplets(path: str) -> List[Tuple[str, str, str]]:
                 triplets.append((parts[0], parts[1], parts[2]))
     return triplets
 
+
 def load_corpus(path: str) -> List[str]:
     """
     Load a corpus from a text file, one document per line.
     """
     file_path = Path(path)
     if not file_path.exists():
-        warnings.warn(f"Corpus file not found: {path}. Returning empty list.")
+        warnings.warn(f"Corpus file not found: {path}. Returning empty list.", stacklevel=2)
         return []
 
     with open(file_path, "r", encoding="utf-8") as f:

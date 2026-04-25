@@ -17,7 +17,7 @@ High-level API examples
 
 from importlib import import_module
 from types import ModuleType
-from typing import Literal
+from typing import Any, Literal
 
 from .core.registry import registry as _registry  # noqa: F401
 
@@ -63,7 +63,7 @@ def quick_experiment(
     k: int = 20,
     geometric: bool = True,
     **kwargs,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """One-liner for geometric retrieval experiments.
 
     Parameters
@@ -159,7 +159,9 @@ def quick_experiment(
 
 # Lazy import conveniences ---------------------------------------------------
 
-__getattr__ = lambda name: _lazy_getattr(name)  # type: ignore
+
+def __getattr__(name: str):
+    return _lazy_getattr(name)
 
 
 def _lazy_getattr(name: str):
