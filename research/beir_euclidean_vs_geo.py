@@ -133,22 +133,21 @@ class ResourceMonitor:
     """Sample process RSS and CUDA peak VRAM while a phase runs."""
 
     def __init__(self, device: str, sample_interval: float = RESOURCE_SAMPLE_INTERVAL_SECONDS):
-        if psutil is None:  # pragma: no cover
-            raise ImportError(
-                "psutil is required for benchmark telemetry. "
-                "Install the project with the dev extra."
-            )
         self.device = device
         self.sample_interval = sample_interval
-        self.process = psutil.Process()
-        self._peak_rss_bytes = int(self.process.memory_info().rss)
+        self.process = psutil.Process() if psutil is not None else None
+        if self.process is not None:
+            self._peak_rss_bytes = int(self.process.memory_info().rss)
+        else:  # pragma: no cover - exercised in environments without psutil
+            self._peak_rss_bytes = 0
         self._peak_vram_bytes = 0
         self._running = False
         self._thread: threading.Thread | None = None
         self._cuda_enabled = device.startswith("cuda") and torch.cuda.is_available()
 
     def _sample_once(self) -> None:
-        self._peak_rss_bytes = max(self._peak_rss_bytes, int(self.process.memory_info().rss))
+        if self.process is not None:
+            self._peak_rss_bytes = max(self._peak_rss_bytes, int(self.process.memory_info().rss))
         if self._cuda_enabled:
             dev = torch.device(self.device)
             self._peak_vram_bytes = max(
@@ -174,7 +173,10 @@ class ResourceMonitor:
         if self._thread is not None:
             self._thread.join()
         self._sample_once()
-        peak_rss_mb = self._peak_rss_bytes / (1024 * 1024)
+        if self.process is not None:
+            peak_rss_mb = self._peak_rss_bytes / (1024 * 1024)
+        else:
+            peak_rss_mb = float("nan")
         if self._cuda_enabled:
             peak_vram_mb = self._peak_vram_bytes / (1024 * 1024)
         else:
