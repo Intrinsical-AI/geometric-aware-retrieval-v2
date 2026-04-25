@@ -93,24 +93,43 @@ print(audit.curvature)
 
 ```
 
+## Current CLI Scope
+
+The CLI is intentionally smaller than the package surface while the public contract is being stabilized.
+
+The supported CLI v0 focus is geometric interpretability and local debugging:
+
+- `geoIR encode`: encode local texts and optionally save `.npy` embeddings.
+- `geoIR audit`: inspect geometric properties of an index built from a local corpus.
+
+The deprecated/unsupported transitional command is:
+
+- `geoIR search`
+
+Notes:
+
+- `geoIR search` is intentionally fail-fast in CLI v0 and pending removal in a future clean CLI cut.
+- `geoIR audit --plot` is experimental and not part of the supported contract yet.
+- For the current architecture and support boundary, see `ARCH.md`.
+
+## Research Benchmark
+
+The BEIR benchmark harness under `research/` is research-only and not part of
+the public package contract.
+
+- Exhaustive benchmark spec: `research/BEIR_BENCHMARK_SPEC.md`
+- Probe runbook: `research/PROBES.md`
+- Result artifacts and aggregation rules: `research/results/beir_euclidean_vs_geo/README.md`
+
 ## Makefile Commands
 
 This repository includes a `Makefile` with the following commands:
 
-- `make lint`: Format and lint the code.
+- `make format`: Format and apply safe lint fixes.
+- `make lint`: Check formatting and linting without rewriting files.
 - `make type`: Run the type checker.
 - `make test`: Run the unit tests.
 - `make clean`: Remove temporary files.
-
-## Examples
-
-See the `examples/` directory for more detailed usage:
-
-- `basic_usage.py`: Demonstrates the basic retrieval pipeline.
-- `quickstart.py`: A quick start guide to the library.
-- `quick_experiment_cli.py`: Shows how to use the command-line interface for experiments.
-- `differentiable_demo.py`: A demonstration of the differentiable retrieval pipeline.
-- `fixed_demo.py`: A demonstration of the fixed retrieval pipeline.
 
 ## Citation
 

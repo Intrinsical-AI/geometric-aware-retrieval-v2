@@ -17,13 +17,21 @@ High-level API examples
 
 from importlib import import_module
 from types import ModuleType
-from typing import Literal
+from typing import Any, Literal
 
-# Import retrieval to register the default encoder
-from . import retrieval  # noqa: F401
 from .core.registry import registry as _registry  # noqa: F401
 
 _Mode = Literal["dual", "mono"]
+
+
+def _ensure_default_encoder_registered() -> None:
+    """Register the default encoder backend on first use.
+
+    Keeping this lazy avoids pulling the optional HuggingFace stack during a
+    plain ``import geoIR`` or CLI help invocation.
+    """
+    if "default" not in _registry["encoder"]:
+        from . import retrieval  # noqa: F401
 
 
 def load_encoder(name: str, mode: _Mode = "dual", **kwargs):
@@ -41,6 +49,7 @@ def load_encoder(name: str, mode: _Mode = "dual", **kwargs):
     mode : Literal["dual", "mono"]
         Dual encoders return separate query/document towers; mono share weights.
     """
+    _ensure_default_encoder_registered()
     try:
         backend_loader = _registry["encoder"]["default"]
     except KeyError as exc:
@@ -54,7 +63,7 @@ def quick_experiment(
     k: int = 20,
     geometric: bool = True,
     **kwargs,
-) -> dict[str, float]:
+) -> dict[str, Any]:
     """One-liner for geometric retrieval experiments.
 
     Parameters
@@ -150,7 +159,9 @@ def quick_experiment(
 
 # Lazy import conveniences ---------------------------------------------------
 
-__getattr__ = lambda name: _lazy_getattr(name)  # type: ignore
+
+def __getattr__(name: str):
+    return _lazy_getattr(name)
 
 
 def _lazy_getattr(name: str):

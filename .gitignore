@@ -189,7 +189,10 @@ plots/
 scripts/
 medium/
 tests/
+!tests/
+tests/*
+!tests/*.py
+!research/results/beir_euclidean_vs_geo/summary.csv
 notebooks/
 outputs/
 paper/
-

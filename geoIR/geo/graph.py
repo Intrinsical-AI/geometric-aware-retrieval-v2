@@ -12,13 +12,13 @@ from typing import Dict, Tuple
 
 try:
     import faiss  # type: ignore
+
     _FAISS_AVAILABLE = True
 except ModuleNotFoundError:  # pragma: no cover
     _FAISS_AVAILABLE = False
 import networkx as nx
 import numpy as np
 import torch
-
 
 
 def build_knn_graph(
@@ -45,9 +45,7 @@ def build_knn_graph(
     """
 
     if metric not in {"euclidean", "cosine"}:
-        raise ValueError(
-            f"Unsupported metric '{metric}'. Choose 'euclidean' or 'cosine'."
-        )
+        raise ValueError(f"Unsupported metric '{metric}'. Choose 'euclidean' or 'cosine'.")
 
     n, d = embeddings.shape
 
@@ -74,7 +72,7 @@ def build_knn_graph(
     G = nx.Graph()
     G.add_nodes_from(range(n))
     for i in range(n):
-        for j, dist in zip(indices[i], distances[i]):
+        for j, dist in zip(indices[i], distances[i], strict=False):
             if j == i:
                 # Skip self-loops; FAISS/naïve search includes the query point itself as
                 # the first neighbour due to k+1 search above.
@@ -107,7 +105,6 @@ __all__ = [
     "build_knn_graph",
     "shortest_paths_dense",
 ]
-
 
 
 class GumbelTopK(torch.nn.Module):
@@ -158,7 +155,7 @@ class SinkhornSort(torch.nn.Module):
         Returns:
             adjacency: [N, N] matriz de adyacencia
         """
-        N = distances.shape[0]
+        distances.shape[0]
 
         # Convertir distancias a costos (negativos)
         costs = -distances
@@ -180,9 +177,11 @@ class SinkhornSort(torch.nn.Module):
 
         return adjacency
 
+
 # ======================================================================================
 # Funciones de Construcción de Grafos
 # ======================================================================================
+
 
 def hard_knn_graph_faiss(embeddings: torch.Tensor, k: int) -> Tuple[torch.Tensor, Dict]:
     """Construye hard k-NN usando Faiss (IP). Retorna matriz de adyacencia y diagnósticos."""
@@ -198,7 +197,7 @@ def hard_knn_graph_faiss(embeddings: torch.Tensor, k: int) -> Tuple[torch.Tensor
     # Build sparse COO adjacency to save memory
     row_idx = torch.arange(n).unsqueeze(1).repeat(1, k).flatten()
     col_idx = torch.tensor(neighbors).flatten()
-    values = torch.ones_like(row_idx, dtype=torch.float32)
+    torch.ones_like(row_idx, dtype=torch.float32)
 
     # Symmetrize by adding reverse edges
     row_idx_sym = torch.cat([row_idx, col_idx])
@@ -225,9 +224,7 @@ def hard_knn_graph_faiss(embeddings: torch.Tensor, k: int) -> Tuple[torch.Tensor
     return adjacency, diag
 
 
-def hard_knn_graph_torch(
-    embeddings: torch.Tensor, k: int
-) -> Tuple[torch.Tensor, torch.Tensor]:
+def hard_knn_graph_torch(embeddings: torch.Tensor, k: int) -> Tuple[torch.Tensor, torch.Tensor]:
     """kNN duro (no diferenciable) usando PyTorch."""
     with torch.no_grad():
         distances = torch.cdist(embeddings, embeddings, p=2)
@@ -252,16 +249,3 @@ def soft_knn_graph_no_tau(
     adjacency = torch.softmax(logits, dim=-1)
     weights = adjacency * distances
     return weights, adjacency
-
-def sparse_soft_knn(embeddings: torch.Tensor, k: int, candidate_ratio: float = 0.1):
-    # Paso 1: Pre-filtrar candidatos con hard-kNN (k_cand = k * candidate_ratio)
-    idx_cand = hard_knn_candidates(embeddings, k=int(k * candidate_ratio))
-    
-    # Paso 2: Calcular D² solo para candidatos
-    sparse_D2 = cdist_sparse(embeddings, idx_cand)
-    
-    # Paso 3: Aplicar softmax solo sobre candidatos
-    P_sparse = softmax_sparse(-sparse_D2 / gamma)
-    
-    # (Mantener τ-fix y simetrización adaptada)
-    # TODO
