@@ -70,11 +70,21 @@ where = ["."]
 exclude = ["tests*", "examples*"]
 
 [tool.ruff]
-select = ["E", "F", "I", "B"]
 line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B"]
 
 [tool.black]
 line-length = 100
+
+[tool.mypy]
+ignore_missing_imports = true
+disable_error_code = ["import-untyped"]
+
+[[tool.mypy.overrides]]
+module = ["geoIR.training.trainer"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 addopts = "-q"

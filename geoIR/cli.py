@@ -1,8 +1,9 @@
 """Command-line interface for geoIR (`geoIR ...`)."""
+
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated
 
 import numpy as np
 import typer
@@ -15,11 +16,19 @@ app = typer.Typer(add_completion=False, rich_markup_mode="rich")
 
 @app.command()
 def encode(
-    model: str = typer.Argument(..., help="Model checkpoint, e.g. 'bge-base'"),
-    texts: List[str] = typer.Argument(..., help="Texts to encode"),
-    output: Optional[Path] = typer.Option(
-        None, "-o", "--output", writable=True, exists=False, dir_okay=False, help="Save embeddings to .npy file"
-    ),
+    model: Annotated[str, typer.Argument(help="Model checkpoint, e.g. 'bge-base'")],
+    texts: Annotated[list[str], typer.Argument(help="Texts to encode")],
+    output: Annotated[
+        Path | None,
+        typer.Option(
+            "-o",
+            "--output",
+            writable=True,
+            exists=False,
+            dir_okay=False,
+            help="Save embeddings to .npy file",
+        ),
+    ] = None,
 ):
     """Encode *TEXTS* with *MODEL* and print vector norms."""
     enc = gi.load_encoder(model)
@@ -32,11 +41,16 @@ def encode(
 
 @app.command(deprecated=True)
 def search(
-    model: str = typer.Argument(..., help="Model checkpoint"),
-    corpus: str = typer.Argument(..., help="Dataset spec, e.g. 'file:~/docs/*.txt' or 'beir/fiqa' or path to .txt"),
-    k: int = typer.Option(30, help="Neighbors for k-NN index"),
-    query: str = typer.Option(..., help="Query to search"),
-    top: int = typer.Option(10, help="Returned docs"),
+    model: Annotated[str, typer.Argument(help="Model checkpoint")],
+    corpus: Annotated[
+        str,
+        typer.Argument(
+            help="Dataset spec, e.g. 'file:~/docs/*.txt' or 'beir/fiqa' or path to .txt"
+        ),
+    ],
+    k: Annotated[int, typer.Option(help="Neighbors for k-NN index")] = 30,
+    query: Annotated[str, typer.Option(help="Query to search")] = "",
+    top: Annotated[int, typer.Option(help="Returned docs")] = 10,
 ):
     """Deprecated search command kept temporarily for CLI compatibility."""
     typer.echo(
@@ -49,13 +63,21 @@ def search(
 
 @app.command()
 def audit(
-    model: str = typer.Argument(..., help="Model checkpoint"),
-    corpus_file: Path = typer.Argument(..., exists=True, readable=True, help="Path to corpus.txt"),
-    k: int = typer.Option(30, help="Neighbors for k-NN index"),
-    plot: bool = typer.Option(
-        False,
-        help="Experimental: generate plot (requires geoIR[viz]); not part of the supported CLI contract.",
-    ),
+    model: Annotated[str, typer.Argument(help="Model checkpoint")],
+    corpus_file: Annotated[
+        Path,
+        typer.Argument(exists=True, readable=True, help="Path to corpus.txt"),
+    ],
+    k: Annotated[int, typer.Option(help="Neighbors for k-NN index")] = 30,
+    plot: Annotated[
+        bool,
+        typer.Option(
+            help=(
+                "Experimental: generate plot (requires geoIR[viz]); "
+                "not part of the supported CLI contract."
+            ),
+        ),
+    ] = False,
 ):
     """Audit curvature/density of *CORPUS_FILE* index."""
     corpus = [line.strip() for line in corpus_file.read_text().splitlines() if line.strip()]

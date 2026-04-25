@@ -291,6 +291,36 @@ def test_deterministic_sample_is_stable() -> None:
     assert first == sorted(first)
 
 
+def test_subsample_dataset_samples_only_queries_with_kept_qrels(tmp_path: Path) -> None:
+    module = load_benchmark_module()
+    corpus = {
+        "d1": {"title": "alpha", "text": "red planet"},
+        "d2": {"title": "beta", "text": "blue ocean"},
+    }
+    queries = {
+        "q1": "missing relevant doc",
+        "q2": "planet",
+    }
+    qrels = {
+        "q1": {"d3": 1},
+        "q2": {"d1": 1},
+    }
+
+    bundle = module.subsample_dataset(
+        "fiqa",
+        tmp_path,
+        corpus,
+        queries,
+        qrels,
+        max_docs=None,
+        max_queries=10,
+        seed=42,
+    )
+
+    assert bundle.query_ids == ["q2"]
+    assert bundle.qrels == {"q2": {"d1": 1}}
+
+
 def test_tensor_cache_paths_are_deterministic(tmp_path: Path) -> None:
     module = load_benchmark_module()
 

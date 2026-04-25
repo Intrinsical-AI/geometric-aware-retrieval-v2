@@ -1,15 +1,22 @@
+PYTHON ?= python
+RUFF ?= $(PYTHON) -m ruff
+MYPY ?= $(PYTHON) -m mypy
+PYTEST ?= $(PYTHON) -m pytest
+
+format:
+	$(RUFF) format .
+	$(RUFF) check . --fix --show-fixes
+
 lint:
-	# Format files first (in place)
-	ruff format geoIR tests
-	# Then, check for linting issues and fix them (in place)
-	ruff check geoIR tests --fix --show-fixes
+	$(RUFF) format --check .
+	$(RUFF) check .
 
 type:
-	mypy geoIR
+	$(MYPY) geoIR
 
 test:
 	# Run unit tests
-	pytest tests/ -v
+	$(PYTEST) tests/ -v
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} +
@@ -23,4 +30,3 @@ summary:
 
 activate_env:
 	source .venv/bin/activate
-
