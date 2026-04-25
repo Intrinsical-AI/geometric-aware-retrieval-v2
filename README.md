@@ -125,7 +125,8 @@ the public package contract.
 
 This repository includes a `Makefile` with the following commands:
 
-- `make lint`: Format and lint the code.
+- `make format`: Format and apply safe lint fixes.
+- `make lint`: Check formatting and linting without rewriting files.
 - `make type`: Run the type checker.
 - `make test`: Run the unit tests.
 - `make clean`: Remove temporary files.

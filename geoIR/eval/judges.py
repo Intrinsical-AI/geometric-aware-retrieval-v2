@@ -12,7 +12,7 @@ from __future__ import annotations
 import os
 from abc import ABC, abstractmethod
 from statistics import mean
-from typing import List
+from typing import Any, List
 
 from geoIR.eval.metrics import MetricResult
 
@@ -98,8 +98,12 @@ class HFJudge(BaseJudge):  # noqa: D101
     def __call__(self, question: str, docs: List[str], answer: str | None = None) -> MetricResult:  # noqa: D401
         answer = answer or " ".join(docs)[:1000]
         prompt = (
-            "You are an expert grader. Given the question and answer, respond with a float between 0 and 1 "
-            "reflecting answer quality.\n\nQuestion:" + question + "\nAnswer:" + answer + "\nScore:"  # noqa: E501
+            "You are an expert grader. Given the question and answer, respond with a "
+            "float between 0 and 1 reflecting answer quality.\n\nQuestion:"
+            + question
+            + "\nAnswer:"
+            + answer
+            + "\nScore:"
         )
         try:
             gen = self._pipe(prompt, max_new_tokens=4, do_sample=False)[0]["generated_text"]
@@ -166,7 +170,7 @@ def judge_ensemble(
     judges = judges or [MockJudge()]
     results = [j(question, docs, answer) for j in judges]
     score = aggregate_scores(results, policy)
-    details = {r.name: r.score for r in results}
+    details: dict[str, Any] = {r.name: r.score for r in results}
     details["policy"] = policy
     return MetricResult(name="LLM_ENSEMBLE", score=float(score), details=details)
 

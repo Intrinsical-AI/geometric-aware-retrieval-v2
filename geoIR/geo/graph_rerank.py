@@ -1,12 +1,10 @@
-from __future__ import annotations
-
 """Graph-based re-ranking utilities (PPR, Heat Kernel, etc.).
 
 Currently provides a lightweight PageRank-style diffusion scorer that can run
 entirely on PyTorch CPU/GPU without external deps.
 """
 
-from typing import List
+from __future__ import annotations
 
 import torch
 
