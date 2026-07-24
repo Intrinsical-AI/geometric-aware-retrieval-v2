@@ -75,9 +75,18 @@ The training module provides the tools for training and fine-tuning retrieval mo
 git clone https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2.git
 cd geometric-aware-retrieval-v2
 
-# Sync the locked development environment with Hugging Face integrations
+# Sync the locked local test environment and its exercised HF interfaces
 uv sync --locked --extra dev --extra hf
 ```
+
+The checked-in uv lock resolves `torch` from PyTorch's explicit CPU index.
+`make check` verifies that the installed wheel has no CUDA runtime, preventing
+the offline test gate from silently downloading NVIDIA packages.
+
+The published Hugging Face integrations remain optional for consumers, but the
+local gate enables `hf` explicitly because the evaluation tests import that
+interface. CI forces Hugging Face offline mode, so validation installs declared
+libraries without downloading model or dataset artifacts.
 
 ## Quick Start
 
@@ -137,10 +146,14 @@ the public package contract.
 
 This repository includes a `Makefile` with the following commands:
 
-- `make format`: Format and apply safe lint fixes.
-- `make lint`: Check formatting and linting without rewriting files.
-- `make type`: Run the type checker.
-- `make test`: Run the unit tests.
+- `make format`: Format the maintained Python sources.
+- `make format-check`: Check formatting without rewriting files.
+- `make lint`: Run Ruff without rewriting files.
+- `make types`: Run the type checker (`make type` remains an alias).
+- `make test`: Run the offline unit tests.
+- `make check`: Verify the CPU backend and run the complete default gate.
+- `make pre-commit`: Run all repository hooks.
+- `make build`: Build wheel and sdist.
 - `make clean`: Remove temporary files.
 
 ## Citation

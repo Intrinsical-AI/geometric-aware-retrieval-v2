@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: project-checks
+        name: project checks
+        entry: make check
+        language: system
+        pass_filenames: false
