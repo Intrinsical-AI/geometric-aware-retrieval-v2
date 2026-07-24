@@ -48,21 +48,23 @@ def build_knn_graph(
         raise ValueError(f"Unsupported metric '{metric}'. Choose 'euclidean' or 'cosine'.")
 
     n, d = embeddings.shape
+    distances: np.ndarray
+    indices: np.ndarray
 
     if metric == "euclidean":
         if _FAISS_AVAILABLE:
-            index = faiss.IndexFlatL2(d)
-            index.add(embeddings.astype(np.float32))
-            distances, indices = index.search(embeddings.astype(np.float32), k + 1)
+            l2_index = faiss.IndexFlatL2(d)
+            l2_index.add(embeddings.astype(np.float32))
+            distances, indices = l2_index.search(embeddings.astype(np.float32), k + 1)
         else:
             distances_full = np.linalg.norm(embeddings[:, None] - embeddings, axis=2)
             indices = np.argsort(distances_full, axis=1)[:, 1 : k + 1]
             distances = np.take_along_axis(distances_full, indices, axis=1)
     else:  # cosine distance = 1 - cosine_similarity
         if _FAISS_AVAILABLE:
-            index = faiss.IndexFlatIP(d)
-            index.add(embeddings.astype(np.float32))
-            sims, indices = index.search(embeddings.astype(np.float32), k + 1)
+            ip_index = faiss.IndexFlatIP(d)
+            ip_index.add(embeddings.astype(np.float32))
+            sims, indices = ip_index.search(embeddings.astype(np.float32), k + 1)
             distances = 1 - sims
         else:
             sims_full = embeddings @ embeddings.T  # cosine similarity
