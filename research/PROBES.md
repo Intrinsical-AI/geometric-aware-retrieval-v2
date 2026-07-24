@@ -6,7 +6,7 @@ ejecutarse desde la raíz del repo.
 
 Contrato exhaustivo del benchmark:
 
-- [BEIR_BENCHMARK_SPEC.md](/home/z3r0/.local/share/dev-home/Proyectos/geometric-aware-retrieval-v2/research/BEIR_BENCHMARK_SPEC.md)
+- [BEIR_BENCHMARK_SPEC.md](BEIR_BENCHMARK_SPEC.md)
 
 ## Probe 1: censo de matriz
 

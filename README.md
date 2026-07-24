@@ -2,6 +2,18 @@
 
 A Python library for geometric-aware information retrieval using differentiable k-nearest neighbors and graph-based re-ranking.
 
+> [!NOTE]
+> This checkout publishes `geoIR` (CLI `geoIR`, import package `geoIR`) while
+> `../Toy-Manifold-Embedding-Experiment` publishes `geoir-toy` (CLI
+> `geoir-toy`, import package `geoir_toy`). Both distribution names and
+> import package names are now distinct, so both can be installed in the
+> same environment.
+
+> [!IMPORTANT]
+> [`mv-search/`](mv-search/README.md) is an independent nested Git repository,
+> not part of the `geoIR` package or release. Its own documentation and
+> manifest are authoritative for its interfaces and commands.
+
 ## Features
 
 - **Geometric-Aware Retrieval**: Utilizes graph-based distances to capture semantic relationships, leading to more meaningful search results.
@@ -63,8 +75,8 @@ The training module provides the tools for training and fine-tuning retrieval mo
 git clone https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2.git
 cd geometric-aware-retrieval-v2
 
-# Install with pip for development
-pip install -e ".[dev,hf]"
+# Sync the locked development environment with Hugging Face integrations
+uv sync --locked --extra dev --extra hf
 ```
 
 ## Quick Start

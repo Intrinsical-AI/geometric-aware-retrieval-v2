@@ -176,6 +176,7 @@ celerybeat.pid
 # ===================
 # Add any additional project-specific ignores below this line
 
+mv-search/
 experiments/
 examples/
 */FEEDBACK.md

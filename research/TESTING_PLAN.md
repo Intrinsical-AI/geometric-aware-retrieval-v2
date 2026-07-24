@@ -11,11 +11,11 @@ No define APIs públicas; define contratos verificables y backlog de cobertura.
 
 ## Runbook operativo
 
-- Spec del benchmark: ver [BEIR_BENCHMARK_SPEC.md](/home/z3r0/.local/share/dev-home/Proyectos/geometric-aware-retrieval-v2/research/BEIR_BENCHMARK_SPEC.md).
-- Probes de terminal: ver [PROBES.md](/home/z3r0/.local/share/dev-home/Proyectos/geometric-aware-retrieval-v2/research/PROBES.md).
+- Spec del benchmark: ver [BEIR_BENCHMARK_SPEC.md](BEIR_BENCHMARK_SPEC.md).
+- Probes de terminal: ver [PROBES.md](PROBES.md).
 - Suite automatizada actual:
-  - [tests/test_beir_benchmark.py](/home/z3r0/.local/share/dev-home/Proyectos/geometric-aware-retrieval-v2/tests/test_beir_benchmark.py)
-  - [tests/test_run_exps.py](/home/z3r0/.local/share/dev-home/Proyectos/geometric-aware-retrieval-v2/tests/test_run_exps.py)
+  - [tests/test_beir_benchmark.py](../tests/test_beir_benchmark.py)
+  - [tests/test_run_exps.py](../tests/test_run_exps.py)
 
 ## Capas de cobertura
 
