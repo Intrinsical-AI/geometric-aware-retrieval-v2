@@ -67,7 +67,7 @@ geoIR = "geoIR.cli:app"
 
 [tool.setuptools.packages.find]
 where = ["."]
-exclude = ["tests*", "examples*"]
+include = ["geoIR*"]
 
 [tool.ruff]
 line-length = 100
