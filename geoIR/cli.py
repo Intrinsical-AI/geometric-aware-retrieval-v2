@@ -39,28 +39,6 @@ def encode(
         typer.echo(f"Saved to {output}")
 
 
-@app.command(deprecated=True)
-def search(
-    model: Annotated[str, typer.Argument(help="Model checkpoint")],
-    corpus: Annotated[
-        str,
-        typer.Argument(
-            help="Dataset spec, e.g. 'file:~/docs/*.txt' or 'beir/fiqa' or path to .txt"
-        ),
-    ],
-    k: Annotated[int, typer.Option(help="Neighbors for k-NN index")] = 30,
-    query: Annotated[str, typer.Option(help="Query to search")] = "",
-    top: Annotated[int, typer.Option(help="Returned docs")] = 10,
-):
-    """Deprecated search command kept temporarily for CLI compatibility."""
-    typer.echo(
-        "geoIR search is deprecated and not supported in CLI v0. "
-        "It will be removed in a future clean CLI cut.",
-        err=True,
-    )
-    raise typer.Exit(code=2)
-
-
 @app.command()
 def audit(
     model: Annotated[str, typer.Argument(help="Model checkpoint")],
@@ -87,10 +65,6 @@ def audit(
     if plot:
         audit_res.plot("tsne")
 
-
-# Alias for backward compatibility: Click entry point expected a `cli` callable.
-# We expose it so old `python -m geoIR.cli` still works.
-cli = app
 
 if __name__ == "__main__":  # pragma: no cover
     app()

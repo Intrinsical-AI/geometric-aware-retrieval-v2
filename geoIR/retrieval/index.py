@@ -130,7 +130,6 @@ class Index:  # noqa: D101
         metric: str = "cosine",
         search_k: int = 1000,
         connect_k: int = 10,
-        mix_kappa: float | None = None,
         alpha: float | None = None,
     ) -> list[int]:  # noqa: D401
         """Search using cosine or cosine+κ(x) mix.
@@ -139,31 +138,27 @@ class Index:  # noqa: D101
         ----------
         query_emb : np.ndarray
             A pre-computed query embedding of shape `(d,)`.
-        mix_kappa : float | None, optional
-            Curvature weight (legacy, prefer `alpha`).
         alpha : float | None, optional
             Mixing factor [0, 1] for cosine vs curvature (0 = pure cosine, 1 = pure curvature).
-            If both `alpha` and `mix_kappa` are provided, `alpha` takes precedence.
         """
 
         metric = metric.lower()
 
         # ------------------------------------------------------------------
-        # 2. Fast path – cosine / curvature-mix (legacy)
+        # 2. Fast path – cosine / curvature mix
         # ------------------------------------------------------------------
         if metric in {"cosine", "curvature", "mix"}:
             sims = (self.embeddings @ query_emb).flatten()
-            mix_kappa_val: float | None
+            curvature_weight: float | None
 
-            # Support both alpha (preferred) and mix_kappa (legacy)
             if alpha is not None:
                 if not 0 <= alpha <= 1:
                     raise ValueError(f"alpha must be between 0 and 1, got {alpha}")
-                mix_kappa_val = alpha / (1 - alpha) if alpha < 1.0 else float("inf")
+                curvature_weight = alpha / (1 - alpha) if alpha < 1.0 else float("inf")
             else:
-                mix_kappa_val = mix_kappa
+                curvature_weight = None
 
-            if mix_kappa_val is not None:
+            if curvature_weight is not None:
                 # compute average curvature per node lazily once
                 if not hasattr(self, "_avg_curv"):
                     from collections import defaultdict
@@ -179,7 +174,7 @@ class Index:  # noqa: D101
                 if alpha is not None and alpha < 1.0:
                     sims = (1 - alpha) * sims + alpha * curv_vals
                 else:
-                    sims = sims + mix_kappa_val * curv_vals
+                    sims = sims + curvature_weight * curv_vals
             return np.argsort(sims)[-k:][::-1].tolist()
 
         # ------------------------------------------------------------------

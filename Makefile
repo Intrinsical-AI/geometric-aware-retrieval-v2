@@ -1,4 +1,4 @@
-.PHONY: help sync verify-cpu format format-check lint types type test check pre-commit build clean summary
+.PHONY: help sync verify-cpu format format-check lint types test check pre-commit build clean summary
 
 .DEFAULT_GOAL := help
 
@@ -28,9 +28,6 @@ lint: sync
 
 types: sync
 	$(RUN) mypy geoIR
-
-type: types
-
 test: sync
 	$(RUN) pytest tests -q
 
