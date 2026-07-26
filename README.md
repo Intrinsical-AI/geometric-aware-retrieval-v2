@@ -10,7 +10,7 @@ A Python library for geometric-aware information retrieval using differentiable 
 > same environment.
 
 > [!IMPORTANT]
-> [`mv-search/`](mv-search/README.md) is an independent nested Git repository,
+> [`../mv-search/`](../mv-search/README.md) is an independent sibling Git repository,
 > not part of the `geoIR` package or release. Its own documentation and
 > manifest are authoritative for its interfaces and commands.
 
