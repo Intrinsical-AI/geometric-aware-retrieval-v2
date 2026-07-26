@@ -30,7 +30,7 @@ No define APIs públicas; define contratos verificables y backlog de cobertura.
 2. Contract tests de artefactos.
    - cada run válido genera `config.json`, `beir_results.json`, `beir_results.csv`, `run.log`
    - `summary.csv` y `SUMMARY.md` se regeneran desde artefactos respaldados
-   - runs legacy o incompletos se excluyen
+   - runs de otro esquema o incompletos hacen fallar el agregado
 
 3. Integration tests offline.
    - fixture BEIR mínimo local
@@ -65,7 +65,7 @@ No define APIs públicas; define contratos verificables y backlog de cobertura.
 - Cache key estable.
 - Run end-to-end offline con artefactos completos.
 - Contrato de `rerank=none` y `rerank=ppr`.
-- Exclusión de runs legacy del summary.
+- Rechazo de runs de otro esquema en el summary.
 - Decisión gate para `soft_local` y `soft_ppr`.
 - Matriz fija del runner.
 

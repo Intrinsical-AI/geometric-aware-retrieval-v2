@@ -193,7 +193,7 @@ respaldados sin un run v2 reproducible.
 
 - Solo cuentan como backed claims los resultados que aparecen en artefactos v2
   válidos.
-- Los runs legacy quedan fuera del agregado hasta rerun real.
+- Los runs de otro esquema hacen fallar el agregado y requieren un rerun real.
 - `SUMMARY.md` y `summary.csv` deben poder regenerarse sin edición manual.
 - Si un claim aparece en notas históricas pero no en artefactos respaldados,
   debe tratarse como no confiable.

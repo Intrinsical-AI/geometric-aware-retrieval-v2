@@ -1137,8 +1137,8 @@ def render_summary_markdown(summary_df: pd.DataFrame, invalid_runs: list[str]) -
         "",
         "This file is generated only from `config.json` + `beir_results.json` artifacts.",
         (
-            f"It only accepts benchmark schema v{BENCHMARK_SCHEMA_VERSION}; "
-            "legacy result rows are skipped."
+            f"It accepts only benchmark schema v{BENCHMARK_SCHEMA_VERSION}; "
+            "any other or invalid run fails summary generation."
         ),
         (
             "Historical manual notes elsewhere in the repo are non-authoritative "
@@ -1186,6 +1186,9 @@ def write_summary_artifacts(experiment_dir: Path) -> tuple[Path, Path]:
     experiment_root = experiment_dir.expanduser().resolve()
     experiment_root.mkdir(parents=True, exist_ok=True)
     summary_df, invalid_runs = build_summary_df(experiment_root)
+    if invalid_runs:
+        joined = ", ".join(invalid_runs)
+        raise ValueError(f"Unsupported or invalid benchmark runs: {joined}")
 
     summary_csv = experiment_root / "summary.csv"
     summary_md = experiment_root / "SUMMARY.md"

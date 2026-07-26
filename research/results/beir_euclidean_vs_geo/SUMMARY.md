@@ -1,7 +1,7 @@
 # BEIR Benchmark Summary
 
 This file is generated only from `config.json` + `beir_results.json` artifacts.
-It only accepts benchmark schema v2; legacy result rows are skipped.
+It only accepts benchmark schema v2; other schema versions fail summary generation.
 Historical manual notes elsewhere in the repo are non-authoritative and intentionally excluded here.
 That includes the previous `msmarco-passage` claims, which are ignored until a backed run exists.
 Hard-graph ranking is currently explicit as absent; the supported comparison is dense cosine baseline vs one candidate path.
