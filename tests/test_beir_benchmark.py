@@ -245,7 +245,7 @@ def write_v2_run_artifacts(
     (run_dir / "beir_results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
 
 
-def write_legacy_run_artifacts(root: Path, run_id: str) -> None:
+def write_v1_run_artifacts(root: Path, run_id: str) -> None:
     run_dir = root / run_id
     run_dir.mkdir(parents=True)
     config = {"dataset": "fiqa", "max_docs": 1000, "rerank": "none"}
@@ -633,7 +633,7 @@ def test_rerank_ppr_uses_ppr_path_only(tmp_path: Path) -> None:
     assert candidate["path_kind"] == "soft_ppr"
 
 
-def test_summary_skips_legacy_runs_and_uses_only_v2_artifacts(tmp_path: Path) -> None:
+def test_summary_rejects_previous_schema_runs(tmp_path: Path) -> None:
     module = load_benchmark_module()
     experiment_root = tmp_path / "beir_euclidean_vs_geo"
     write_v2_run_artifacts(
@@ -644,24 +644,13 @@ def test_summary_skips_legacy_runs_and_uses_only_v2_artifacts(tmp_path: Path) ->
         rerank="none",
         ppr_topk=100,
     )
-    write_legacy_run_artifacts(experiment_root, "2025-07-20_23-40-45")
+    write_v1_run_artifacts(experiment_root, "2025-07-20_23-40-45")
 
-    summary_csv, summary_md = module.write_summary_artifacts(experiment_root)
+    with pytest.raises(ValueError, match="Unsupported or invalid benchmark runs"):
+        module.write_summary_artifacts(experiment_root)
 
-    summary_df = pd.read_csv(summary_csv)
-    assert len(summary_df) == 1
-    assert summary_df.iloc[0]["dataset"] == "fiqa"
-    assert summary_df.iloc[0]["baseline_method"] == "Dense cosine baseline"
-    assert summary_df.iloc[0]["candidate_method"] == "Soft graph local"
-    assert "candidate_peak_rss_mb" in summary_df.columns
-    assert "candidate_neighbor_purity_at_k" in summary_df.columns
-    assert "candidate_edge_overlap_with_dense_at_k" in summary_df.columns
-
-    summary_text = summary_md.read_text(encoding="utf-8")
-    assert "schema v2" in summary_text
-    assert "Cand RSS MB" in summary_text
-    assert "Skipped Runs" in summary_text
-    assert "2025-07-20_23-40-45" in summary_text
+    assert not (experiment_root / "summary.csv").exists()
+    assert not (experiment_root / "SUMMARY.md").exists()
 
 
 def test_render_decision_gate_for_soft_local_and_ppr() -> None:

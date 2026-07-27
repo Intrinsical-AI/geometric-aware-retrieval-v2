@@ -123,13 +123,8 @@ The supported CLI v0 focus is geometric interpretability and local debugging:
 - `geoIR encode`: encode local texts and optionally save `.npy` embeddings.
 - `geoIR audit`: inspect geometric properties of an index built from a local corpus.
 
-The deprecated/unsupported transitional command is:
-
-- `geoIR search`
-
 Notes:
 
-- `geoIR search` is intentionally fail-fast in CLI v0 and pending removal in a future clean CLI cut.
 - `geoIR audit --plot` is experimental and not part of the supported contract yet.
 - For the current architecture and support boundary, see `ARCH.md`.
 
@@ -149,7 +144,7 @@ This repository includes a `Makefile` with the following commands:
 - `make format`: Format the maintained Python sources.
 - `make format-check`: Check formatting without rewriting files.
 - `make lint`: Run Ruff without rewriting files.
-- `make types`: Run the type checker (`make type` remains an alias).
+- `make types`: Run the type checker.
 - `make test`: Run the offline unit tests.
 - `make check`: Verify the CPU backend and run the complete default gate.
 - `make pre-commit`: Run all repository hooks.

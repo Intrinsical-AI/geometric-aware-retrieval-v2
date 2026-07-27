@@ -13,7 +13,7 @@ Regla operativa:
 
 - No mantener tablas manuales en este `README.md`.
 - No sacar conclusiones desde notas históricas si no están respaldadas por un par `config.json` + `beir_results.json`.
-- El agregado acepta solo el esquema de benchmark actual; los runs legacy quedan fuera hasta rerun real.
+- El agregado acepta solo el esquema de benchmark actual; los runs de otro esquema hacen fallar la generación hasta un rerun real.
 - Los claims manuales previos sobre `msmarco-passage` quedan no confiables hasta que exista un rerun respaldado por artefactos.
 
 Para regenerar el resumen agregado sin editar archivos a mano, vuelve a ejecutar

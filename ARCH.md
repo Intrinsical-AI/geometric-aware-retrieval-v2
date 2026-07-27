@@ -63,7 +63,7 @@ Decision text for the current draft:
 - Keep `geoIR audit` as the primary CLI command for geometric interpretability over local corpora.
 - Treat `geoIR audit --plot` as experimental until `AuditResult` carries graph data and the plotting path is documented and tested.
 - Remove `geoIR report-save` from the public CLI surface.
-- Keep `geoIR search` only as a deprecated and unsupported compatibility stub until the next clean CLI cut.
+- Remove `geoIR search` from the public CLI surface.
 - Remove `geoIR eval` from the public CLI surface.
 
 This shrink is intentional. The CLI is being optimized for geometric inspection and local debugging, not for general retrieval serving, benchmark orchestration, or LLM-judge workflows.
@@ -75,7 +75,7 @@ This matrix covers the flows that should be validated with the team first.
 | Flow | Intended audience | Initial status | Why it is classified this way | Candidate acceptance check |
 | --- | --- | --- | --- | --- |
 | `import geoIR` | library consumers | Experimental | The package now lazy-registers the retrieval backend so plain `import geoIR` no longer pulls the optional HuggingFace stack at import time. The flow remains experimental until the team decides whether no-extra package import is part of the supported contract and adds an explicit smoke test. | In a clean environment without the `hf` extra, verify `python -c "import geoIR"` succeeds. |
-| `geoIR search` | CLI users | Deprecated / unsupported | The command remains temporarily visible for compatibility, but now fails fast by design. The underlying defects still exist: `geoIR.data` exposes no `load` entry point, and `Index.search` expects `query_emb: np.ndarray` while the old CLI passed a raw `str`. The command is pending removal in a future clean CLI cut. | Keep a smoke test that verifies the deprecated command exits with a clear unsupported message and code `2`. |
+| `geoIR search` | CLI users | Removed from CLI v0 | The historical command was not executable against the current loader and index contracts, so it is no longer registered. | Keep it absent from CLI help unless a future implementation defines and tests a new supported contract. |
 | `geoIR eval` | CLI users | Removed from CLI v0 | The historical command was removed from the public CLI surface. Its previous implementation called `_SUD(obj["gt_docs"], obj["new_docs"], reference=obj["reference"])`, which did not match `SUD(query, gt_docs, new_docs, *, judges=None, policy="mean")`. | Keep it absent from CLI help until or unless a future CLI surface reintroduces a supported evaluation workflow. |
 | `quick_experiment` | library/demo users | Experimental | The public docstring in `geoIR/__init__.py` suggests `beir/fiqa` style datasets, but the implementation passes `dataset` to `load_corpus(str(corpus_path))`, which treats it as a local plain-text file path. The triplet construction (`negatives = corpus[1:] + corpus[:1]`) is a synthetic rotation, not a real triplet-mining step. | Decide whether this helper is local-demo only or a real benchmark entry point; then test against a tiny fixture and align the docstring with the actual behavior. |
 | `training` (classic) | model developers | Unsupported | `_train_classic` calls `self.encoder.q_model.fit(...)`, but `encoder.q_model` is built via `AutoModel.from_pretrained(model_name)` in `geoIR/retrieval/encoder.py`. `AutoModel` does not expose a `.fit(train_objectives=...)` API; only `sentence_transformers.SentenceTransformer` does. The classic path cannot execute as written. | Either wrap the encoder so its `q_model` is a `SentenceTransformer`, or rewrite `_train_classic` against the HF Trainer / a plain PyTorch loop. Add one regression test covering the chosen contract. |
@@ -211,7 +211,7 @@ Current state does not yet meet that bar.
 ## Questions To Validate With The Team
 
 1. Do we want `import geoIR` without the `hf` extra to be part of the supported contract? This PR makes that possible via lazy retrieval backend registration, but it is not yet declared stable.
-2. Does the team accept the proposed CLI v0 scope: keep `encode` and `audit`, keep `audit --plot` experimental, keep `search` deprecated/unsupported until the next clean cut, and remove `eval` plus `report-save` from the public CLI surface?
+2. The accepted CLI v0 scope keeps `encode` and `audit`, keeps `audit --plot` experimental, and removes `search`, `eval`, and `report-save` from the public CLI surface.
 3. Is `quick_experiment` a demo helper or a maintained benchmark entry point? The current docstring and implementation disagree.
 4. Is training in scope for the near-term public API, or only for internal research? Both classic and geometric paths fail to execute today; neither can be promoted without non-trivial work.
 5. Should `research/` remain intentionally non-portable, or should it become reproducible from a clean checkout?
