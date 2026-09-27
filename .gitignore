@@ -42,6 +42,8 @@ pip-delete-this-directory.txt
 # ===================
 venv/
 .pytest_cache/
+.pre-commit-cache/
+.uv_cache/
 /data/
 runs/
 
