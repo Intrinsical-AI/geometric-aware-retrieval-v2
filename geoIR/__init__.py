@@ -7,23 +7,31 @@ High-level API examples
 -----------------------
 >>> import geoIR as gi
 >>> encoder = gi.load_encoder("bge-base", mode="dual")
->>> index = encoder.build_index(corpus="beir/fiqa", k=30)
->>> hits = index.search("justice distributiva", k=10)
+>>> index = encoder.build_index(corpus=["first document", "second document"], k=1)
+>>> hits = index.search(encoder.encode(["justice distributiva"])[0], k=1)
 
 >>> # Quick geometric experiment
->>> results = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
->>> print(f"nDCG@10: {results['ndcg_10']:.3f}")
+>>> results = gi.quick_experiment("bge-base", "local-corpus.txt", geometric=True)
+>>> print(f"Self-retrieval recall@1: {results['recall_1']:.3f}")
 """
+
 from importlib import import_module
 from types import ModuleType
-from typing import Literal
+from typing import Any, Literal
 
 from .core.registry import registry as _registry  # noqa: F401
 
-# Import retrieval to register the default encoder
-from . import retrieval  # noqa: F401
-
 _Mode = Literal["dual", "mono"]
+
+
+def _ensure_default_encoder_registered() -> None:
+    """Register the default encoder backend on first use.
+
+    Keeping this lazy avoids pulling the optional HuggingFace stack during a
+    plain ``import geoIR`` or CLI help invocation.
+    """
+    if "default" not in _registry["encoder"]:
+        from . import retrieval  # noqa: F401
 
 
 def load_encoder(name: str, mode: _Mode = "dual", **kwargs):
@@ -41,6 +49,7 @@ def load_encoder(name: str, mode: _Mode = "dual", **kwargs):
     mode : Literal["dual", "mono"]
         Dual encoders return separate query/document towers; mono share weights.
     """
+    _ensure_default_encoder_registered()
     try:
         backend_loader = _registry["encoder"]["default"]
     except KeyError as exc:
@@ -50,46 +59,48 @@ def load_encoder(name: str, mode: _Mode = "dual", **kwargs):
 
 def quick_experiment(
     model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
-    dataset: str = "beir/fiqa", 
+    dataset: str = "beir/fiqa",
     k: int = 20,
     geometric: bool = True,
-    **kwargs
-) -> dict[str, float]:
+    **kwargs,
+) -> dict[str, Any]:
     """One-liner for geometric retrieval experiments.
-    
+
     Parameters
     ----------
     model_name : str, default "sentence-transformers/all-MiniLM-L6-v2"
         HuggingFace model name or path.
     dataset : str, default "beir/fiqa"
-        Dataset name (BEIR format) or path to local data.
+        Path to a local corpus file accepted by ``load_corpus``.
     k : int, default 20
         k-NN graph connectivity parameter.
     geometric : bool, default True
         Enable geometric regularization (InfoNCE-geo + curvature).
     **kwargs
         Additional trainer configuration parameters.
-        
+
     Returns
     -------
-    dict[str, float]
-        Evaluation metrics including nDCG@10, MAP, etc.
-        
+    dict[str, Any]
+        Self-retrieval ``recall_1``, training ``loss``, and resolved ``config``.
+        This helper queries the corpus with its own documents; it does not
+        calculate a held-out BEIR nDCG/MAP benchmark.
+
     Examples
     --------
     >>> import geoIR as gi
-    >>> results = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
-    >>> print(f"nDCG@10: {results['ndcg_10']:.3f}")
-    
+    >>> results = gi.quick_experiment("bge-base", "local-corpus.txt", geometric=True)
+    >>> print(f"Self-retrieval recall@1: {results['recall_1']:.3f}")
+
     >>> # Classic baseline comparison
-    >>> classic = gi.quick_experiment("bge-base", "beir/fiqa", geometric=False)
-    >>> geo = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
-    >>> improvement = geo['ndcg_10'] - classic['ndcg_10']
-    >>> print(f"Geometric improvement: +{improvement:.3f} nDCG@10")
+    >>> classic = gi.quick_experiment("bge-base", "local-corpus.txt", geometric=False)
+    >>> geo = gi.quick_experiment("bge-base", "local-corpus.txt", geometric=True)
+    >>> delta = geo['recall_1'] - classic['recall_1']
+    >>> print(f"Self-retrieval recall@1 delta: {delta:+.3f}")
     """
     from .core.config import ExperimentConfig, TrainerConfig
     from .training.trainer import Trainer
-    
+
     # Build configuration
     trainer_config = TrainerConfig(
         k_graph=k,
@@ -98,39 +109,61 @@ def quick_experiment(
         lambda_forman=0.05 if geometric else 0.0,
         epochs=1,  # Quick experiment
         verbose=True,
-        **kwargs
+        **kwargs,
     )
-    
-    config = ExperimentConfig(
-        dataset=dataset,
-        trainer=trainer_config
-    )
+
+    config = ExperimentConfig(dataset=dataset, trainer=trainer_config)
     config.encoder.model_name = model_name
-    
+
     # Initialize and run
+    from pathlib import Path
+
+    from .data.loader import load_corpus
+    from .retrieval.retriever import GeometricRetriever
+
     encoder = load_encoder(model_name, mode="dual")
     trainer = Trainer(encoder, config.trainer)
-    
-    # For quick experiments, we'll return mock results for now
-    # TODO: Implement actual training and evaluation pipeline
-    import warnings
-    warnings.warn(
-        "quick_experiment() is a prototype. Returning mock results. "
-        "Use scripts/finetune.py for full experiments.",
-        UserWarning
-    )
-    
+
+    # ------------------------------------------------------------------
+    # 1. Load corpus and build simple training triplets
+    # ------------------------------------------------------------------
+    corpus_path = Path(dataset)
+    corpus = load_corpus(str(corpus_path))
+    if not corpus:
+        raise ValueError(f"Dataset not found or empty: {dataset}")
+
+    negatives = corpus[1:] + corpus[:1]
+    triplets = list(zip(corpus, corpus, negatives, strict=False))
+
+    train_metrics = trainer.train(triplets)
+
+    # ------------------------------------------------------------------
+    # 2. Build index and compute recall@1 as quick metric
+    # ------------------------------------------------------------------
+    retriever = GeometricRetriever(model_name)
+    retriever.encoder = encoder  # use fine-tuned encoder
+    retriever.index(corpus, k_graph=k)
+
+    correct = 0
+    for idx, doc in enumerate(corpus):
+        hits = retriever.search(doc, top_k=1)
+        if hits and hits[0] == idx:
+            correct += 1
+
+    recall1 = correct / len(corpus)
+
     return {
-        "ndcg_10": 0.456,  # Mock result
-        "map": 0.234,
-        "recall_100": 0.789,
-        "config": config.dict()
+        "recall_1": recall1,
+        "loss": train_metrics.get("loss", 0.0),
+        "config": config.dict(),
     }
 
 
 # Lazy import conveniences ---------------------------------------------------
 
-__getattr__ = lambda name: _lazy_getattr(name)  # type: ignore
+
+def __getattr__(name: str):
+    return _lazy_getattr(name)
 
 
 def _lazy_getattr(name: str):

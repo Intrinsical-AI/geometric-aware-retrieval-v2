@@ -1,6 +1,7 @@
 """Central registry inspired by ARCH.md."""
+
 from collections import defaultdict
-from typing import Callable, Dict
+from typing import Callable
 
 
 class Registry(defaultdict):
@@ -25,4 +26,4 @@ class Registry(defaultdict):
         return f"Registry(groups={list(self.keys())})"
 
 
-registry: "Registry[str, Dict[str, Callable]]" = Registry()
+registry: Registry = Registry()

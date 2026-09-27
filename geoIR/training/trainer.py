@@ -4,10 +4,11 @@ This module provides a generic `Trainer` class that can be configured for
 different training modes (classic, geometric, etc.) to streamline the
 fine-tuning process.
 """
+
 from __future__ import annotations
 
 import warnings
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import torch
@@ -15,9 +16,6 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from geoIR.core.config import TrainerConfig
-from geoIR.geo.curvature import forman_ricci_weighted, ricci_ollivier
-from geoIR.geo.graph import build_knn_graph, shortest_paths_dense
-from geoIR.losses import forman_loss, info_nce_geo, ricci_loss
 from geoIR.retrieval.encoder import Encoder
 
 
@@ -44,7 +42,7 @@ class Trainer:
             from sentence_transformers import InputExample, losses
             from sentence_transformers.datasets import NoDuplicatesDataLoader
         except ModuleNotFoundError:
-            warnings.warn("Install `sentence_transformers` for fine-tuning support.")
+            warnings.warn("Install `sentence_transformers` for fine-tuning support.", stacklevel=2)
             return {}
 
         train_examples = [InputExample(texts=[q, p, n]) for q, p, n in triplets]
@@ -69,9 +67,9 @@ class Trainer:
         self.encoder.q_model.train()
         optimizer = torch.optim.Adam(self.encoder.q_model.parameters(), lr=self.config.lr)
 
-        queries, pos_docs, neg_docs = zip(*triplets)
+        queries, pos_docs, neg_docs = zip(*triplets, strict=False)
         all_texts = sorted(list(set(queries) | set(pos_docs) | set(neg_docs)))
-        text_to_idx = {text: i for i, text in enumerate(all_texts)}
+        {text: i for i, text in enumerate(all_texts)}
 
         dataset = TensorDataset(torch.arange(len(triplets)))
         loader = DataLoader(dataset, batch_size=self.config.batch_size, shuffle=True)
@@ -80,13 +78,13 @@ class Trainer:
 
         # Import differentiable modules
         from ..geo.differentiable import geometric_loss_end_to_end
-        
+
         for epoch in range(self.config.epochs):
             if self.config.verbose:
-                print(f"--- Epoch {epoch+1}/{self.config.epochs} ---")
+                print(f"--- Epoch {epoch + 1}/{self.config.epochs} ---")
 
             # Temperature scheduling for Soft-kNN (optional)
-            gamma = max(0.05, 0.2 * (0.95 ** epoch))  # Decay from 0.2 to 0.05
+            gamma = max(0.05, 0.2 * (0.95**epoch))  # Decay from 0.2 to 0.05
             if self.config.verbose:
                 print(f"  - Soft-kNN temperature: {gamma:.4f}")
 
@@ -107,31 +105,41 @@ class Trainer:
                 # --- Differentiable Geometric Loss ---
                 if self.config.geodesic:
                     # Use differentiable geometric pipeline
-                    n_vecs_reshaped = n_vecs.unsqueeze(1)  # [batch, 1, dim] for geometric_loss_end_to_end
-                    
+                    n_vecs_reshaped = n_vecs.unsqueeze(
+                        1
+                    )  # [batch, 1, dim] for geometric_loss_end_to_end
+
                     total_loss, metrics = geometric_loss_end_to_end(
-                        q_vecs, p_vecs, n_vecs_reshaped,
+                        q_vecs,
+                        p_vecs,
+                        n_vecs_reshaped,
                         k_graph=self.config.k_graph,
                         gamma=gamma,  # Use scheduled temperature
                         lambda_ricci=self.config.lambda_ricci,
                         kappa_target=self.config.kappa_target,
-                        heat_time=getattr(self.config, 'heat_time', 1.0),
-                        heat_steps=getattr(self.config, 'heat_steps', 5)
+                        heat_time=getattr(self.config, "heat_time", 1.0),
+                        heat_steps=getattr(self.config, "heat_steps", 5),
                     )
-                    
-                    loss_nce = metrics['loss_info']
-                    loss_r = metrics.get('loss_ricci', 0.0)
+
+                    loss_nce = metrics["loss_info"]
+                    loss_r = metrics.get("loss_ricci", 0.0)
                     loss_f = 0.0  # Forman not implemented in differentiable version yet
-                    
-                    if self.config.verbose and batch_indices_tensor[0].item() == 0:  # Log first batch
-                        print(f"    Geometric distances - pos: {metrics['mean_d_pos']:.4f}, neg: {metrics['mean_d_neg']:.4f}")
-                        
+
+                    if (
+                        self.config.verbose and batch_indices_tensor[0].item() == 0
+                    ):  # Log first batch
+                        print(
+                            "    Geometric distances - "
+                            f"pos: {metrics['mean_d_pos']:.4f}, "
+                            f"neg: {metrics['mean_d_neg']:.4f}"
+                        )
+
                 else:
                     # Fallback to standard triplet loss if not using geodesic distances
                     loss_nce = F.triplet_margin_loss(q_vecs, p_vecs, n_vecs)
                     loss_r = torch.tensor(0.0, device=self.device)
                     loss_f = torch.tensor(0.0, device=self.device)
-                    
+
                     total_loss = loss_nce
 
                 total_loss.backward()
@@ -142,10 +150,9 @@ class Trainer:
                 history["loss_ricci"].append(loss_r.item())
                 history["loss_forman"].append(loss_f.item())
 
-            epoch_loss = np.mean(history['loss'][-len(loader):])
+            epoch_loss = np.mean(history["loss"][-len(loader) :])
             if self.config.verbose:
                 print(f"  - Epoch Loss: {epoch_loss:.4f}")
 
         self.encoder.q_model.eval()
         return {k: float(np.mean(v)) for k, v in history.items()}
-

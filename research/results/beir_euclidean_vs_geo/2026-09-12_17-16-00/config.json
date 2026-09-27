@@ -1,0 +1,19 @@
+{
+    "benchmark_schema_version": 2,
+    "dataset": "fiqa",
+    "dataset_dir": null,
+    "download_dir": "datasets",
+    "allow_download": true,
+    "max_docs": 1000,
+    "max_queries": 100,
+    "k": 20,
+    "device": "cpu",
+    "rerank": "ppr",
+    "ppr_topk": 100,
+    "ppr_alpha": 0.2,
+    "batch_size": 256,
+    "seed": 42,
+    "split": "dev",
+    "model_name": "all-MiniLM-L6-v2",
+    "hard_graph_ranking_status": "absent"
+}

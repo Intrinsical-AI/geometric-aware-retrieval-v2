@@ -1,0 +1,12 @@
+# Citation file format: https://citation-file-format.github.io/
+
+cff-version: 1.2.0
+message: "If you use this library, please cite it as below."
+title: "geoIR: Geometric-Aware Information Retrieval"
+version: "0.1.0"
+authors:
+  - name: "IntrinsicalAI"
+    orcid: "0000-0000-0000-0000"
+license: "Apache-2.0"
+repository-code: "https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2"
+url: "https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2"

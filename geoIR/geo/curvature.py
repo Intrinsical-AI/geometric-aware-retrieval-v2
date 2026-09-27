@@ -3,6 +3,7 @@
 This module provides functions to compute graph curvature, focusing on Ollivier-Ricci
 and its computationally cheaper alternative, Forman-Ricci.
 """
+
 from __future__ import annotations
 
 from typing import Dict, Tuple
@@ -69,13 +70,10 @@ def forman_ricci_weighted(G: nx.Graph, weight: str = "weight") -> Dict[Tuple[int
 
 
 def ricci_ollivier(
-    G: nx.Graph, 
-    alpha: float = 0.5, 
-    verbose: bool = False,
-    backend: str = "auto"
+    G: nx.Graph, alpha: float = 0.5, verbose: bool = False, backend: str = "auto"
 ) -> Dict[Tuple[int, int], float]:
     """Compute Ricci curvature with automatic backend selection.
-    
+
     Parameters
     ----------
     G : nx.Graph
@@ -89,19 +87,19 @@ def ricci_ollivier(
         - "auto": Try Ollivier-Ricci, fallback to Forman if package unavailable
         - "ollivier": Force Ollivier-Ricci (requires GraphRicciCurvature package)
         - "forman": Use fast Forman-Ricci approximation
-        
+
     Returns
     -------
     Dict[Tuple[int, int], float]
         Dictionary mapping edges (u, v) to their curvature values.
-        
+
     Raises
     ------
     ModuleNotFoundError
         If backend="ollivier" but GraphRicciCurvature is not installed.
     ValueError
         If backend is not one of the supported options.
-        
+
     Notes
     -----
     Ollivier-Ricci curvature is more accurate but computationally expensive O(k³).
@@ -109,30 +107,33 @@ def ricci_ollivier(
     """
     if backend not in {"auto", "ollivier", "forman"}:
         raise ValueError(f"Unknown backend '{backend}'. Choose from: auto, ollivier, forman")
-    
+
     if backend == "forman":
         return forman_ricci_weighted(G)
-    
+
     # Try Ollivier-Ricci (backend="ollivier" or "auto")
     try:
         from GraphRicciCurvature.OllivierRicci import OllivierRicci  # type: ignore
-        
+
         if verbose:
-            print(f"Computing Ollivier-Ricci curvature (α={alpha}) on {G.number_of_edges()} edges...")
-        
+            print(
+                f"Computing Ollivier-Ricci curvature (α={alpha}) on {G.number_of_edges()} edges..."
+            )
+
         orc = OllivierRicci(G, alpha=alpha, verbose=verbose)
         orc.compute_ricci_curvature()
         return {edge: orc.G[edge[0]][edge[1]]["ricciCurvature"] for edge in orc.G.edges()}
-        
-    except ModuleNotFoundError:
+
+    except ModuleNotFoundError as exc:
         if backend == "ollivier":
             raise ModuleNotFoundError(
                 "GraphRicciCurvature package required for backend='ollivier'. "
                 "Install with: pip install GraphRicciCurvature"
-            )
-        
+            ) from exc
+
         # Fallback for backend="auto"
         import warnings
+
         warnings.warn(
             "GraphRicciCurvature not available. Using Forman-Ricci as approximation. "
             "Install GraphRicciCurvature for exact Ollivier-Ricci computation.",

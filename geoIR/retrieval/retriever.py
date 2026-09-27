@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
+from ..geo.graph import build_knn_graph
 from .encoder import Encoder
 from .index import Index
-from ..geo.graph import build_knn_graph
 
 
 class GeometricRetriever:
     """A high-level interface for building and searching a geometric-aware index."""
 
-    def __init__(self, model_name_or_path: str, device: Optional[str] = None):
+    def __init__(
+        self,
+        model_name_or_path: str,
+        device: Optional[Literal["cpu", "cuda", "mps"]] = None,
+    ):
         """Initialize the retriever with a sentence-transformer model."""
         self.encoder = Encoder(model_name_or_path, device=device)
         self.index_: Optional[Index] = None

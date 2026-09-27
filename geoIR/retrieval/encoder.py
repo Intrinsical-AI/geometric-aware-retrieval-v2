@@ -12,11 +12,8 @@ the geoIR pipeline.  Key design goals:
 
 from __future__ import annotations
 
-from functools import lru_cache
-from pathlib import Path
-from typing import Any, Dict, Iterable, List, Literal, Mapping, Sequence, Tuple, Union
-
 import warnings
+from typing import Any, List, Literal, Sequence
 
 import numpy as np
 import torch
@@ -25,17 +22,19 @@ from transformers import AutoModel, AutoTokenizer
 from geoIR.core.registry import registry
 from geoIR.geo.graph import build_knn_graph
 from geoIR.retrieval.index import Index
+
 # ------------------------------------------------------------------
 # Optional dataset loader (may be absent in minimal install).
 # ------------------------------------------------------------------
 try:
     from geoIR.data import load as _load_ds  # type: ignore
 except Exception:  # pragma: no cover – fallback lightweight loader
-    from geoIR.data.fallback import load_text_file
-    
-    def _load_ds(path: str, *_, max_docs: int | None = None, **__) -> "MinimalDataset":
+    from geoIR.data.fallback import MinimalDataset, load_text_file
+
+    def _load_ds(path: str, *_, max_docs: int | None = None, **__) -> MinimalDataset:
         """Fallback loader using the dedicated fallback module."""
         return load_text_file(path, max_docs=max_docs)
+
 
 # -------------------------------------------------------------
 # Type Aliases
@@ -49,6 +48,7 @@ _DeviceT = Literal["cpu", "cuda", "mps"]
 # Dataset utilities
 # -------------------------------------------------------------
 
+
 def _infer_text_column(column_names: Sequence[str]) -> str:
     """Heuristic to pick a reasonable text column from a HF dataset."""
     PREFERRED = ("text", "content", "document", "passage")
@@ -59,10 +59,10 @@ def _infer_text_column(column_names: Sequence[str]) -> str:
     return column_names[0]
 
 
-
 # -------------------------------------------------------------
 # Encoder
 # -------------------------------------------------------------
+
 
 class Encoder:  # noqa: D101
     def __init__(
@@ -107,7 +107,9 @@ class Encoder:  # noqa: D101
     def _encode_batch(self, texts: Sequence[str], *, is_query: bool) -> torch.Tensor:
         tokenizer = self.q_tokenizer if is_query else self.d_tokenizer
         model = self.q_model if is_query else self.d_model
-        inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt").to(self.device)
+        inputs = tokenizer(texts, padding=True, truncation=True, return_tensors="pt").to(
+            self.device
+        )
         outputs = model(**inputs)
         vec = outputs.last_hidden_state[:, 0, :]  # CLS pooling
         return torch.nn.functional.normalize(vec, dim=1) if self.normalize else vec
@@ -212,6 +214,7 @@ class Encoder:  # noqa: D101
 # -----------------------------------------------------------------
 # Registry hook → enables `gi.load_encoder("hf", ...)`
 # -----------------------------------------------------------------
+
 
 @registry.register("encoder")("default")
 def _load_encoder(name: str, *, mode: _ModeT = "dual", **kw: Any) -> Encoder:  # noqa: D401

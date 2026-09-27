@@ -2,14 +2,35 @@
 
 A Python library for geometric-aware information retrieval using differentiable k-nearest neighbors and graph-based re-ranking.
 
+> [!NOTE]
+> This checkout publishes `geoIR` (CLI `geoIR`, import package `geoIR`) while
+> `../Toy-Manifold-Embedding-Experiment` publishes `geoir-toy` (CLI
+> `geoir-toy`, import package `geoir_toy`). Both distribution names and
+> import package names are now distinct, so both can be installed in the
+> same environment.
+
+> [!IMPORTANT]
+> [`../mv-search/`](../mv-search/README.md) is an independent sibling Git repository,
+> not part of the `geoIR` package or release. Its own documentation and
+> manifest are authoritative for its interfaces and commands.
+
 ## Features
 
-- **Geometric-Aware Retrieval**: Utilizes graph-based distances to capture semantic relationships, leading to more meaningful search results.
+- **Experimental Geometric Retrieval**: Compares graph-based candidate paths with a dense cosine baseline. Improved retrieval quality is a hypothesis, not an established result.
 - **Differentiable Pipeline**: The entire retrieval process is end-to-end trainable, allowing for fine-tuning and optimization.
 - **Multiple Backends**: Supports FAISS for efficient similarity search, with the flexibility to integrate other backends.
 - **Pre-trained Models**: Seamlessly integrates with HuggingFace's `sentence-transformers` for access to a wide range of pre-trained models.
 - **Comprehensive Evaluation**: Includes built-in support for standard information retrieval metrics (e.g., MAP, NDCG) and novel geometric metrics (e.g., RARE, SUD).
 - **Modular Design**: The library is organized into distinct modules for easy extension and customization.
+
+The six backed schema-v2 FiQA runs in the
+[generated benchmark summary](research/results/beir_euclidean_vs_geo/SUMMARY.md)
+all lose nDCG@10 against the dense baseline. They support the recorded decisions
+to withhold soft-kNN promotion and freeze PPR for the next research cycle; they
+do not establish a general benchmark win. Earlier schema-v1 observations are
+preserved separately in `research/results/beir_euclidean_vs_geo.v1_archive/`.
+The `beir_euclidean_vs_geo.failed_sigill/` directory contains an incomplete attempt,
+which is excluded from successful-run aggregation.
 
 ## Modules
 
@@ -63,9 +84,18 @@ The training module provides the tools for training and fine-tuning retrieval mo
 git clone https://github.com/Intrinsical-AI/geometric-aware-retrieval-v2.git
 cd geometric-aware-retrieval-v2
 
-# Install with pip for development
-pip install -e ".[dev,hf]"
+# Sync the locked local test environment and its exercised HF interfaces
+uv sync --locked --extra dev --extra hf
 ```
+
+The checked-in uv lock resolves `torch` from PyTorch's explicit CPU index.
+`make check` verifies that the installed wheel has no CUDA runtime, preventing
+the offline test gate from silently downloading NVIDIA packages.
+
+The published Hugging Face integrations remain optional for consumers, but the
+local gate enables `hf` explicitly because the evaluation tests import that
+interface. CI forces Hugging Face offline mode, so validation installs declared
+libraries without downloading model or dataset artifacts.
 
 ## Quick Start
 
@@ -93,24 +123,43 @@ print(audit.curvature)
 
 ```
 
+## Current CLI Scope
+
+The CLI is intentionally smaller than the package surface while the public contract is being stabilized.
+
+The supported CLI v0 focus is geometric interpretability and local debugging:
+
+- `geoIR encode`: encode local texts and optionally save `.npy` embeddings.
+- `geoIR audit`: inspect geometric properties of an index built from a local corpus.
+
+Notes:
+
+- `geoIR audit --plot` is experimental and not part of the supported contract yet.
+- For the current architecture and support boundary, see `ARCH.md`.
+
+## Research Benchmark
+
+The BEIR benchmark harness under `research/` is research-only and not part of
+the public package contract.
+
+- Exhaustive benchmark spec: `research/BEIR_BENCHMARK_SPEC.md`
+- Probe runbook: `research/PROBES.md`
+- Result artifacts and aggregation rules: `research/results/beir_euclidean_vs_geo/README.md`
+
 ## Makefile Commands
 
 This repository includes a `Makefile` with the following commands:
 
-- `make lint`: Format and lint the code.
-- `make type`: Run the type checker.
-- `make test`: Run the unit tests.
+- `make format`: Format the maintained Python sources.
+- `make format-check`: Check formatting without rewriting files.
+- `make lint`: Run Ruff without rewriting files.
+- `make types`: Run the type checker.
+- `make test`: Run the offline unit tests.
+- `make check`: Verify the CPU backend and run the complete default gate.
+- `make pre-commit`: Run all repository hooks.
+- `make build`: Build wheel and sdist.
+- `make summary`: Regenerate the existing backed-run summaries without executing a benchmark or downloading models/data.
 - `make clean`: Remove temporary files.
-
-## Examples
-
-See the `examples/` directory for more detailed usage:
-
-- `basic_usage.py`: Demonstrates the basic retrieval pipeline.
-- `quickstart.py`: A quick start guide to the library.
-- `quick_experiment_cli.py`: Shows how to use the command-line interface for experiments.
-- `differentiable_demo.py`: A demonstration of the differentiable retrieval pipeline.
-- `fixed_demo.py`: A demonstration of the fixed retrieval pipeline.
 
 ## Citation
 

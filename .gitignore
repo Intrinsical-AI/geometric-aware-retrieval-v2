@@ -42,6 +42,8 @@ pip-delete-this-directory.txt
 # ===================
 venv/
 .pytest_cache/
+.pre-commit-cache/
+.uv_cache/
 /data/
 runs/
 
@@ -175,13 +177,25 @@ celerybeat.pid
 # Project-specific
 # ===================
 # Add any additional project-specific ignores below this line
-# examples/
+
+mv-search/
+experiments/
+examples/
+*/FEEDBACK.md
 out/
 concat.py
 concatenated_code.py
-experiments/
 embeddings/
 docs/
 datasets/
 plots/
 scripts/
+medium/
+tests/
+!tests/
+tests/*
+!tests/*.py
+!research/results/beir_euclidean_vs_geo/summary.csv
+notebooks/
+outputs/
+paper/

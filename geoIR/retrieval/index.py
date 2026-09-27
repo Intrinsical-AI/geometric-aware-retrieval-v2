@@ -1,13 +1,15 @@
 """Index object wrapping embeddings, k-NN graph and geo audit helpers."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import List
-import json
 import hashlib
-from datetime import datetime
+import json
 import pickle
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+from typing import List
+
 import numpy as np
 
 from geoIR.geo.curvature import ricci_ollivier
@@ -19,7 +21,7 @@ class AuditResult:  # noqa: D101
 
     def plot(self, layout: str = "spring", node_size: int = 50, **kwargs):
         """Plot the k-NN graph structure with optional geometric annotations.
-        
+
         Parameters
         ----------
         layout : str, default "spring"
@@ -28,12 +30,12 @@ class AuditResult:  # noqa: D101
             Size of nodes in the plot.
         **kwargs
             Additional arguments passed to matplotlib/networkx plotting.
-            
+
         Returns
         -------
         matplotlib.figure.Figure or None
             Figure object if matplotlib available, None otherwise.
-            
+
         Notes
         -----
         Requires matplotlib and optionally plotly for interactive plots.
@@ -44,18 +46,21 @@ class AuditResult:  # noqa: D101
             import networkx as nx
         except ImportError:
             import warnings
+
             warnings.warn(
                 "Plotting requires matplotlib and networkx. "
                 "Install with: pip install matplotlib networkx",
-                UserWarning
+                UserWarning,
+                stacklevel=2,
             )
             return None
-            
-        if not hasattr(self, 'graph') or self.graph is None:
+
+        if not hasattr(self, "graph") or self.graph is None:
             import warnings
-            warnings.warn("No graph available. Build index first with .build()")
+
+            warnings.warn("No graph available. Build index first with .build()", stacklevel=2)
             return None
-            
+
         # Create layout
         if layout == "spring":
             pos = nx.spring_layout(self.graph)
@@ -65,15 +70,25 @@ class AuditResult:  # noqa: D101
             pos = nx.kamada_kawai_layout(self.graph)
         else:
             pos = nx.spring_layout(self.graph)  # fallback
-            
+
         # Plot
         fig, ax = plt.subplots(figsize=(10, 8))
-        nx.draw(self.graph, pos, ax=ax, node_size=node_size, 
-                with_labels=False, node_color='lightblue', 
-                edge_color='gray', alpha=0.7, **kwargs)
-        
-        ax.set_title(f"k-NN Graph ({self.graph.number_of_nodes()} nodes, "
-                    f"{self.graph.number_of_edges()} edges)")
+        nx.draw(
+            self.graph,
+            pos,
+            ax=ax,
+            node_size=node_size,
+            with_labels=False,
+            node_color="lightblue",
+            edge_color="gray",
+            alpha=0.7,
+            **kwargs,
+        )
+
+        ax.set_title(
+            f"k-NN Graph ({self.graph.number_of_nodes()} nodes, "
+            f"{self.graph.number_of_edges()} edges)"
+        )
         plt.tight_layout()
         return fig
 
@@ -94,6 +109,7 @@ class Index:  # noqa: D101
 
     Supports persistence via :py:meth:`save` / :py:meth:`load`.
     """
+
     def __init__(self, embeddings: np.ndarray, corpus: List[str], graph):  # type: ignore[valid-type]
         """Instantiate an Index."""
         self.embeddings = embeddings
@@ -114,7 +130,6 @@ class Index:  # noqa: D101
         metric: str = "cosine",
         search_k: int = 1000,
         connect_k: int = 10,
-        mix_kappa: float | None = None,
         alpha: float | None = None,
     ) -> list[int]:  # noqa: D401
         """Search using cosine or cosine+κ(x) mix.
@@ -123,30 +138,20 @@ class Index:  # noqa: D101
         ----------
         query_emb : np.ndarray
             A pre-computed query embedding of shape `(d,)`.
-        mix_kappa : float | None, optional
-            Curvature weight (legacy, prefer `alpha`).
         alpha : float | None, optional
             Mixing factor [0, 1] for cosine vs curvature (0 = pure cosine, 1 = pure curvature).
-            If both `alpha` and `mix_kappa` are provided, `alpha` takes precedence.
         """
 
         metric = metric.lower()
 
         # ------------------------------------------------------------------
-        # 2. Fast path – cosine / curvature-mix (legacy)
+        # 2. Fast path – cosine / curvature mix
         # ------------------------------------------------------------------
         if metric in {"cosine", "curvature", "mix"}:
             sims = (self.embeddings @ query_emb).flatten()
-
-            # Support both alpha (preferred) and mix_kappa (legacy)
             if alpha is not None:
                 if not 0 <= alpha <= 1:
                     raise ValueError(f"alpha must be between 0 and 1, got {alpha}")
-                mix_kappa_val = alpha / (1 - alpha) if alpha < 1.0 else float("inf")
-            else:
-                mix_kappa_val = mix_kappa
-
-            if mix_kappa_val is not None:
                 # compute average curvature per node lazily once
                 if not hasattr(self, "_avg_curv"):
                     from collections import defaultdict
@@ -159,11 +164,8 @@ class Index:  # noqa: D101
                     self._avg_curv = {n: float(np.mean(vals)) for n, vals in avg.items()}
 
                 curv_vals = np.array([self._avg_curv.get(i, 0.0) for i in range(len(sims))])
-                if alpha is not None and alpha < 1.0:
-                    sims = (1 - alpha) * sims + alpha * curv_vals
-                else:
-                    sims = sims + mix_kappa_val * curv_vals
-            return np.argsort(sims)[-k:][::-1]
+                sims = (1 - alpha) * sims + alpha * curv_vals
+            return np.argsort(sims)[-k:][::-1].tolist()
 
         # ------------------------------------------------------------------
         # 3. Geodesic rerank (hybrid)  – Strategy C
@@ -197,25 +199,25 @@ class Index:  # noqa: D101
     # Persistence helpers
     # ------------------------------------------------------------------
     @classmethod
-    def load(cls, file: str | Path) -> 'Index':  # noqa: D401
+    def load(cls, file: str | Path) -> "Index":  # noqa: D401
         """Load a serialised index from *file*.
-        
+
         Args:
             file: Path to the saved index file
-            
+
         Returns:
             Loaded Index instance
         """
         path = Path(file).expanduser().resolve()
         with path.open("rb") as f:
             return pickle.load(f)
-            
+
     def save(self, file: str | Path) -> str:  # noqa: D401
         """Serialise the index to *file* using :pymod:`pickle`.
 
         Args:
             file: Path where to save the index
-            
+
         Returns:
             Absolute path of the written file.
         """

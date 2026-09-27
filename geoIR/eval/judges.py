@@ -6,14 +6,15 @@ This module defines a minimal interface so we can plug different judge engines
 required packages or keys are missing, the judge will raise a clear error so
 callers can skip/replace it.
 """
+
 from __future__ import annotations
 
 import os
 from abc import ABC, abstractmethod
 from statistics import mean
-from typing import List
+from typing import Any, List
 
-from geoIR.geo.metrics import MetricResult
+from geoIR.eval.metrics import MetricResult
 
 __all__ = [
     "BaseJudge",
@@ -64,7 +65,9 @@ class OpenAIJudge(BaseJudge):  # noqa: D101
             {"role": "system", "content": prompt},
             {"role": "user", "content": f"Question: {question}\nAnswer: {answer}"},
         ]
-        resp = self._openai.ChatCompletion.create(model=self._model, messages=messages, temperature=0.0)
+        resp = self._openai.ChatCompletion.create(
+            model=self._model, messages=messages, temperature=0.0
+        )
         # Expect the model to respond with a float in [0,1]
         try:
             score = float(resp.choices[0].message["content"].strip())
@@ -86,15 +89,21 @@ class HFJudge(BaseJudge):  # noqa: D101
         try:
             from transformers import pipeline  # type: ignore
         except ModuleNotFoundError as exc:  # pragma: no cover
-            raise RuntimeError("transformers package not installed – install or use MockJudge") from exc
+            raise RuntimeError(
+                "transformers package not installed – install or use MockJudge"
+            ) from exc
         kwargs = {"model": model, "device": device} if device is not None else {"model": model}
         self._pipe = pipeline("text-generation", **kwargs)
 
     def __call__(self, question: str, docs: List[str], answer: str | None = None) -> MetricResult:  # noqa: D401
         answer = answer or " ".join(docs)[:1000]
         prompt = (
-            "You are an expert grader. Given the question and answer, respond with a float between 0 and 1 "
-            "reflecting answer quality.\n\nQuestion:" + question + "\nAnswer:" + answer + "\nScore:"  # noqa: E501
+            "You are an expert grader. Given the question and answer, respond with a "
+            "float between 0 and 1 reflecting answer quality.\n\nQuestion:"
+            + question
+            + "\nAnswer:"
+            + answer
+            + "\nScore:"
         )
         try:
             gen = self._pipe(prompt, max_new_tokens=4, do_sample=False)[0]["generated_text"]
@@ -122,6 +131,7 @@ class MockJudge(BaseJudge):  # noqa: D101
 # ---------------------------------------------------------------------------
 # Aggregation / Voting
 # ---------------------------------------------------------------------------
+
 
 def aggregate_scores(results: List[MetricResult], policy: str = "mean") -> float:  # noqa: D401
     """Combine multiple judge scores into a single value.
@@ -160,7 +170,7 @@ def judge_ensemble(
     judges = judges or [MockJudge()]
     results = [j(question, docs, answer) for j in judges]
     score = aggregate_scores(results, policy)
-    details = {r.name: r.score for r in results}
+    details: dict[str, Any] = {r.name: r.score for r in results}
     details["policy"] = policy
     return MetricResult(name="LLM_ENSEMBLE", score=float(score), details=details)
 
@@ -168,6 +178,7 @@ def judge_ensemble(
 # ---------------------------------------------------------------------------
 # Factory helper
 # ---------------------------------------------------------------------------
+
 
 def make_judges(names: str | List[str]) -> List[BaseJudge]:  # noqa: D401
     """Instantiate judges from *names* string or list.
