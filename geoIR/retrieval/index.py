@@ -149,16 +149,9 @@ class Index:  # noqa: D101
         # ------------------------------------------------------------------
         if metric in {"cosine", "curvature", "mix"}:
             sims = (self.embeddings @ query_emb).flatten()
-            curvature_weight: float | None
-
             if alpha is not None:
                 if not 0 <= alpha <= 1:
                     raise ValueError(f"alpha must be between 0 and 1, got {alpha}")
-                curvature_weight = alpha / (1 - alpha) if alpha < 1.0 else float("inf")
-            else:
-                curvature_weight = None
-
-            if curvature_weight is not None:
                 # compute average curvature per node lazily once
                 if not hasattr(self, "_avg_curv"):
                     from collections import defaultdict
@@ -171,10 +164,7 @@ class Index:  # noqa: D101
                     self._avg_curv = {n: float(np.mean(vals)) for n, vals in avg.items()}
 
                 curv_vals = np.array([self._avg_curv.get(i, 0.0) for i in range(len(sims))])
-                if alpha is not None and alpha < 1.0:
-                    sims = (1 - alpha) * sims + alpha * curv_vals
-                else:
-                    sims = sims + curvature_weight * curv_vals
+                sims = (1 - alpha) * sims + alpha * curv_vals
             return np.argsort(sims)[-k:][::-1].tolist()
 
         # ------------------------------------------------------------------

@@ -7,12 +7,12 @@ High-level API examples
 -----------------------
 >>> import geoIR as gi
 >>> encoder = gi.load_encoder("bge-base", mode="dual")
->>> index = encoder.build_index(corpus="beir/fiqa", k=30)
->>> hits = index.search("justice distributiva", k=10)
+>>> index = encoder.build_index(corpus=["first document", "second document"], k=1)
+>>> hits = index.search(encoder.encode(["justice distributiva"])[0], k=1)
 
 >>> # Quick geometric experiment
->>> results = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
->>> print(f"nDCG@10: {results['ndcg_10']:.3f}")
+>>> results = gi.quick_experiment("bge-base", "local-corpus.txt", geometric=True)
+>>> print(f"Self-retrieval recall@1: {results['recall_1']:.3f}")
 """
 
 from importlib import import_module
@@ -71,7 +71,7 @@ def quick_experiment(
     model_name : str, default "sentence-transformers/all-MiniLM-L6-v2"
         HuggingFace model name or path.
     dataset : str, default "beir/fiqa"
-        Dataset name (BEIR format) or path to local data.
+        Path to a local corpus file accepted by ``load_corpus``.
     k : int, default 20
         k-NN graph connectivity parameter.
     geometric : bool, default True
@@ -81,20 +81,22 @@ def quick_experiment(
 
     Returns
     -------
-    dict[str, float]
-        Evaluation metrics including nDCG@10, MAP, etc.
+    dict[str, Any]
+        Self-retrieval ``recall_1``, training ``loss``, and resolved ``config``.
+        This helper queries the corpus with its own documents; it does not
+        calculate a held-out BEIR nDCG/MAP benchmark.
 
     Examples
     --------
     >>> import geoIR as gi
-    >>> results = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
-    >>> print(f"nDCG@10: {results['ndcg_10']:.3f}")
+    >>> results = gi.quick_experiment("bge-base", "local-corpus.txt", geometric=True)
+    >>> print(f"Self-retrieval recall@1: {results['recall_1']:.3f}")
 
     >>> # Classic baseline comparison
-    >>> classic = gi.quick_experiment("bge-base", "beir/fiqa", geometric=False)
-    >>> geo = gi.quick_experiment("bge-base", "beir/fiqa", geometric=True)
-    >>> improvement = geo['ndcg_10'] - classic['ndcg_10']
-    >>> print(f"Geometric improvement: +{improvement:.3f} nDCG@10")
+    >>> classic = gi.quick_experiment("bge-base", "local-corpus.txt", geometric=False)
+    >>> geo = gi.quick_experiment("bge-base", "local-corpus.txt", geometric=True)
+    >>> delta = geo['recall_1'] - classic['recall_1']
+    >>> print(f"Self-retrieval recall@1 delta: {delta:+.3f}")
     """
     from .core.config import ExperimentConfig, TrainerConfig
     from .training.trainer import Trainer
