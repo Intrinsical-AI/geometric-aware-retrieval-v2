@@ -13,12 +13,18 @@ Regla operativa:
 
 - No mantener tablas manuales en este `README.md`.
 - No sacar conclusiones desde notas históricas si no están respaldadas por un par `config.json` + `beir_results.json`.
-- El agregado acepta solo el esquema de benchmark actual; los runs de otro esquema hacen fallar la generación hasta un rerun real.
+- El agregado acepta solo el esquema de benchmark actual; los runs de otro esquema hacen fallar la generación. El archivo hermano `.v1_archive` conserva las observaciones anteriores sin mezclarlas con v2.
 - Los claims manuales previos sobre `msmarco-passage` quedan no confiables hasta que exista un rerun respaldado por artefactos.
 
-Para regenerar el resumen agregado sin editar archivos a mano, vuelve a ejecutar
-una corrida con `research/beir_euclidean_vs_geo.py` o la matriz fija con
-`run_exps.py`; cada run refresca `SUMMARY.md` y `summary.csv`.
+Para regenerar el resumen de los artefactos existentes sin ejecutar nuevos
+experimentos, usa `make summary`. No descarga modelos ni datasets. Las corridas
+explícitas con `research/beir_euclidean_vs_geo.py` o `run_exps.py` también
+actualizan el agregado, pero no son necesarias para verificar lo ya registrado.
+
+Los seis runs v2 conservados pierden nDCG@10 frente al baseline denso; las
+decisiones negativas quedan en `SUMMARY.md`. El directorio hermano
+`.failed_sigill` conserva la configuración de un intento sin resultados completos
+y no entra en el agregado de runs terminados.
 
 Para aislamiento rápido y probes efímeros desde terminal, ver
 `research/PROBES.md`.

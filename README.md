@@ -16,12 +16,21 @@ A Python library for geometric-aware information retrieval using differentiable 
 
 ## Features
 
-- **Geometric-Aware Retrieval**: Utilizes graph-based distances to capture semantic relationships, leading to more meaningful search results.
+- **Experimental Geometric Retrieval**: Compares graph-based candidate paths with a dense cosine baseline. Improved retrieval quality is a hypothesis, not an established result.
 - **Differentiable Pipeline**: The entire retrieval process is end-to-end trainable, allowing for fine-tuning and optimization.
 - **Multiple Backends**: Supports FAISS for efficient similarity search, with the flexibility to integrate other backends.
 - **Pre-trained Models**: Seamlessly integrates with HuggingFace's `sentence-transformers` for access to a wide range of pre-trained models.
 - **Comprehensive Evaluation**: Includes built-in support for standard information retrieval metrics (e.g., MAP, NDCG) and novel geometric metrics (e.g., RARE, SUD).
 - **Modular Design**: The library is organized into distinct modules for easy extension and customization.
+
+The six backed schema-v2 FiQA runs in the
+[generated benchmark summary](research/results/beir_euclidean_vs_geo/SUMMARY.md)
+all lose nDCG@10 against the dense baseline. They support the recorded decisions
+to withhold soft-kNN promotion and freeze PPR for the next research cycle; they
+do not establish a general benchmark win. Earlier schema-v1 observations are
+preserved separately in `research/results/beir_euclidean_vs_geo.v1_archive/`.
+The `beir_euclidean_vs_geo.failed_sigill/` directory contains an incomplete attempt,
+which is excluded from successful-run aggregation.
 
 ## Modules
 
@@ -149,6 +158,7 @@ This repository includes a `Makefile` with the following commands:
 - `make check`: Verify the CPU backend and run the complete default gate.
 - `make pre-commit`: Run all repository hooks.
 - `make build`: Build wheel and sdist.
+- `make summary`: Regenerate the existing backed-run summaries without executing a benchmark or downloading models/data.
 - `make clean`: Remove temporary files.
 
 ## Citation

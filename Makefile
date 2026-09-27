@@ -46,8 +46,8 @@ clean:
 	rm -rf .mypy_cache/
 	rm -rf .ruff_cache/
 
-summary:
-	@echo "No summary script available"
+summary: sync
+	$(RUN) python -c "from pathlib import Path; from research.beir_euclidean_vs_geo import write_summary_artifacts; write_summary_artifacts(Path('research/results/beir_euclidean_vs_geo'))"
 
 activate_env:
 	source .venv/bin/activate
