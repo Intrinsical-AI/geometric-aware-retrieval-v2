@@ -295,6 +295,7 @@ def geometric_loss_end_to_end(
     kappa_target: float = 0.0,
     heat_time: float = 1.0,
     heat_steps: int = 5,
+    gamma: float | None = None,
 ) -> Tuple[torch.Tensor, dict]:
     """Loss geométrica completamente diferenciable end-to-end.
 
@@ -321,6 +322,9 @@ def geometric_loss_end_to_end(
         Tiempo de difusión para heat kernel.
     heat_steps : int, default 5
         Pasos de aproximación para heat kernel.
+    gamma : float | None, default None
+        Temperatura del soft k-NN, pasada a ``soft_knn_graph``
+        (``None`` = auto-calibración).
 
     Returns
     -------
@@ -362,7 +366,7 @@ def geometric_loss_end_to_end(
     total_nodes = all_embeddings.size(0)
 
     # 2. Construir grafo soft k-NN diferenciable
-    A = soft_knn_graph(all_embeddings, k=min(k_graph, total_nodes - 1))
+    A = soft_knn_graph(all_embeddings, k=min(k_graph, total_nodes - 1), gamma=gamma)
 
     # 3. Calcular distancias geodésicas
     d_geo = heat_kernel_distances(A, t=heat_time, steps=heat_steps)
