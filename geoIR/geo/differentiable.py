@@ -152,6 +152,128 @@ def soft_knn_graph(
         return W
 
 
+@torch.no_grad()
+def soft_knn_graph_sparse(
+    embeddings: torch.Tensor,
+    k: int = 8,
+    gamma: float | None = None,
+    return_adjacency: bool = True,
+    return_diagnostics: bool = True,
+    block_rows: int = 512,
+) -> Any:
+    """Inference-only ``soft_knn_graph`` that never materializes an N x N matrix.
+
+    Rows are processed in blocks of ``block_rows`` with the same gamma
+    auto-calibration, row softmax, tau-fix, per-row top-k threshold (ties kept),
+    symmetrization and row renormalization as ``soft_knn_graph``. Peak memory is
+    O(block_rows * N + N * k) instead of several N x N tensors. Returns
+    ``scipy.sparse.csr_matrix`` weights/adjacency (float32) and the same
+    diagnostics; values agree with the dense version up to float32 rounding.
+    No gradients flow through this function.
+    """
+    import math
+
+    import numpy as np
+    import scipy.sparse as sp
+
+    E = embeddings.detach()
+    N = E.size(0)
+    device = E.device
+
+    gamma_value: float | torch.Tensor
+    if gamma is None:
+        # Same sampling (and global RNG call) as soft_knn_graph; D2 only on the sample.
+        if N > 2000:
+            idx = torch.randperm(N, device=device)[:2000]
+            D2_sample = torch.cdist(E[idx], E[idx], p=2).pow(2)
+        else:
+            D2_sample = torch.cdist(E, E, p=2).pow(2)
+        sigma2 = torch.quantile(D2_sample[D2_sample > 0], 0.2)
+        del D2_sample
+        gamma_value = sigma2 / math.log(k)
+        if return_diagnostics:
+            print(f"Auto-calibrated γ = {gamma_value:.4f} (σ² = {sigma2:.4f})")
+    else:
+        gamma_value = gamma
+
+    rows, cols, a_parts, d2_parts = [], [], [], []
+    for r0 in range(0, N, block_rows):
+        r1 = min(N, r0 + block_rows)
+        D2 = torch.cdist(E[r0:r1], E, p=2).pow(2)
+        Z = -D2 / gamma_value
+        local = torch.arange(r1 - r0, device=device)
+        Z[local, local + r0] = float("-inf")
+        P = torch.softmax(Z, dim=-1)
+        A = P * (k / P.sum(dim=-1, keepdim=True))
+        if k < N - 1:
+            thresh = A.topk(k, dim=-1).values[:, -1].unsqueeze(1)
+            keep = A >= thresh
+        else:
+            keep = torch.ones_like(A, dtype=torch.bool)
+        keep &= A != 0  # exact zeros carry no mass in any later step
+        r, c = keep.nonzero(as_tuple=True)
+        rows.append((r + r0).cpu().numpy())
+        cols.append(c.cpu().numpy())
+        a_parts.append(A[r, c].cpu().numpy())
+        d2_parts.append(D2[r, c].cpu().numpy())
+        del D2, Z, P, A, keep
+
+    row_idx = np.concatenate(rows)
+    col_idx = np.concatenate(cols)
+    kept = sp.csr_matrix(
+        (np.concatenate(a_parts), (row_idx, col_idx)), shape=(N, N), dtype=np.float32
+    )
+    D2_kept = sp.csr_matrix(
+        (np.concatenate(d2_parts), (row_idx, col_idx)), shape=(N, N), dtype=np.float32
+    )
+    A_sym = ((kept + kept.T) * np.float32(0.5)).tocsr()
+    D2_sym = D2_kept.maximum(D2_kept.T).tocsr()  # D2 is symmetric; fill transposed-only entries
+    row_sum = np.asarray(A_sym.sum(axis=1), dtype=np.float32).ravel() + np.float32(1e-8)
+    A_final = (sp.diags(np.float32(k) / row_sum) @ A_sym).tocsr().astype(np.float32)
+    W = A_final.multiply(D2_sym).tocsr().astype(np.float32)
+
+    diagnostics = None
+    if return_diagnostics:
+        row_mass = np.asarray(A_final.sum(axis=1), dtype=np.float64).ravel()
+        A_norm = (sp.diags(1.0 / (row_mass + 1e-12)) @ A_final).tocsr()
+        values = A_norm.data
+        entropy_rows = np.zeros(N)
+        np.add.at(
+            entropy_rows,
+            np.repeat(np.arange(N), np.diff(A_norm.indptr)),
+            values * np.log(values + 1e-12),
+        )
+        square_rows = np.zeros(N)
+        np.add.at(square_rows, np.repeat(np.arange(N), np.diff(A_norm.indptr)), values * values)
+        entropy = float(-entropy_rows.mean())
+        eff_degree = float(1.0 / square_rows.mean())
+        actual_degree = float(row_mass.mean())
+        gamma_used = (
+            float(gamma_value.item())
+            if isinstance(gamma_value, torch.Tensor)
+            else float(gamma_value)
+        )
+        diagnostics = {
+            "gamma_used": gamma_used,
+            "entropy": entropy,
+            "effective_degree": eff_degree,
+            "actual_degree": actual_degree,
+            "target_degree": k,
+            "degree_error": abs(actual_degree - k),
+            "status": "optimal"
+            if entropy > 1.0 and abs(eff_degree - k) < k * 0.3
+            else "suboptimal",
+        }
+
+    if return_diagnostics and return_adjacency:
+        return W, A_final, diagnostics
+    if return_diagnostics:
+        return W, diagnostics
+    if return_adjacency:
+        return W, A_final
+    return W
+
+
 def heat_kernel_distances(
     A: torch.Tensor, t: float = 1.0, steps: int = 10, normalize: bool = True
 ) -> torch.Tensor:
