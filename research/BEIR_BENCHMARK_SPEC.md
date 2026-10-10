@@ -221,6 +221,15 @@ Ejecutar la matriz fija de FiQA:
 uv run python run_exps.py --dataset fiqa --no-download --batch-size 256
 ```
 
+Corpus grandes (p. ej. `--max-docs` sin límite): `--soft-graph-impl sparse`
+construye el mismo grafo soft k-NN por bloques de filas (`soft_knn_graph_sparse`)
+y la referencia densa de vecinos sin matrices N×N. El valor por defecto es `dense`.
+En FiQA con 1.000 y 5.000 documentos, `sparse` produce los mismos `nDCG@10`,
+`Recall@10`, `neighbor_purity@k` y `edge_overlap_with_dense@k`. Las estadísticas
+del grafo coinciden hasta redondeo float32, y el pico de RSS a 5.000 documentos
+baja de ~1,5 GB a ~0,7 GB. El valor queda registrado en `config.json` como
+`soft_graph_impl`.
+
 Probes rápidos:
 
 - [PROBES.md](./PROBES.md) para replay del summary y diagnóstico de columnas.
