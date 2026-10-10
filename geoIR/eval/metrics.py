@@ -49,6 +49,11 @@ def graph_distribution_metrics(A: torch.Tensor) -> Dict[str, float]:
     return {"entropy": entropy.item(), "effective_degree": eff_degree.item()}
 
 
+def _sub_adjacency(A: torch.Tensor, idx: torch.Tensor) -> torch.Tensor:
+    """Return ``A[idx][:, idx]`` without materializing the ``len(idx) x N`` row block."""
+    return A[idx.unsqueeze(1), idx]
+
+
 def evaluate_retrieval_soft_local(
     query_emb: torch.Tensor,
     doc_emb: torch.Tensor,
@@ -76,7 +81,7 @@ def evaluate_retrieval_soft_local(
         sims = sims_all[i]
         candidate_topk = min(topk, len(doc_ids))
         _, idx = sims.topk(candidate_topk)
-        sub_adj = A_soft[idx][:, idx]
+        sub_adj = _sub_adjacency(A_soft, idx)
         row_sum = sub_adj.sum(dim=-1, keepdim=True) + 1e-12
         sub_adj = sub_adj / row_sum
 
@@ -115,7 +120,7 @@ def evaluate_retrieval_ppr(
         sims = sims_all[i]
         candidate_topk = min(topk, len(doc_ids))
         _, idx = sims.topk(candidate_topk)
-        sub_adj = A_soft[idx][:, idx]
+        sub_adj = _sub_adjacency(A_soft, idx)
         row_sum = sub_adj.sum(dim=-1, keepdim=True) + 1e-12
         sub_adj = sub_adj / row_sum
         prior = sims[idx].clamp(min=1e-6)
