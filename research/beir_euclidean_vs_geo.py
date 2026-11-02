@@ -243,7 +243,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
         choices=["dense", "sparse"],
         help=(
             "Soft k-NN implementation: 'dense' materializes N x N tensors; 'sparse' builds "
-            "the same graph in row blocks so large corpora fit in memory."
+            "the same graph in row blocks with CSR output. Tied edges can still be quadratic."
         ),
     )
     parser.add_argument(
@@ -642,7 +642,8 @@ def dense_topk_neighbors(
 def adjacency_topk_neighbors(adjacency: Any, k: int) -> list[list[int]]:
     """Return top-k neighbors per document using adjacency weights."""
     if scipy.sparse.issparse(adjacency):
-        csr = adjacency.tocsr()
+        csr = adjacency.astype(np.float32).tocsr(copy=True)
+        csr.sum_duplicates()
         num_docs = csr.shape[0]
         neighbor_k = min(k, num_docs - 1)
         if neighbor_k <= 0:
@@ -653,8 +654,23 @@ def adjacency_topk_neighbors(adjacency: Any, k: int) -> list[list[int]]:
             cols, values = csr.indices[start:stop], csr.data[start:stop]
             off_diagonal = cols != row
             cols, values = cols[off_diagonal], values[off_diagonal]
-            order = np.argsort(-values, kind="stable")[:neighbor_k]
-            result.append([int(col) for col in cols[order]])
+            order = np.argsort(-values, kind="stable")
+            selected = values[order[:neighbor_k]]
+            tied_boundary = len(values) > neighbor_k and (values[order[neighbor_k]] == selected[-1])
+            if (
+                len(selected) < neighbor_k
+                or selected[-1] <= 0
+                or len(np.unique(selected)) != neighbor_k
+                or tied_boundary
+            ):
+                # The dense reference uses torch.topk's tie order, including implicit
+                # zero entries. Reproduce it using only one dense row of temporary space.
+                dense_row = torch.zeros(num_docs, dtype=torch.float32)
+                dense_row[torch.from_numpy(cols.astype(np.int64))] = torch.from_numpy(values)
+                dense_row[row] = float("-inf")
+                result.append([int(col) for col in dense_row.topk(neighbor_k).indices.tolist()])
+            else:
+                result.append([int(col) for col in cols[order[:neighbor_k]]])
         return result
     if adjacency.is_sparse:
         dense_adj = adjacency.to_dense()

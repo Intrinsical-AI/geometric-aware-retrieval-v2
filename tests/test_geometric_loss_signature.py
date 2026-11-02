@@ -60,3 +60,13 @@ def test_scheduled_gamma_gives_finite_loss() -> None:
     loss, metrics = geometric_loss_end_to_end(*_embeddings(), k_graph=3, gamma=0.1)
     assert math.isfinite(loss.item())
     assert math.isfinite(metrics["loss_total"])
+
+
+def test_scheduled_gamma_preserves_finite_training_gradients() -> None:
+    embeddings = _embeddings()
+    loss, _ = geometric_loss_end_to_end(*embeddings, k_graph=3, gamma=0.2)
+    loss.backward()
+    for tensor in embeddings:
+        assert tensor.grad is not None
+        assert torch.isfinite(tensor.grad).all()
+        assert tensor.grad.norm() > 0

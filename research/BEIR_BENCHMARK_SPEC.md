@@ -222,13 +222,19 @@ uv run python run_exps.py --dataset fiqa --no-download --batch-size 256
 ```
 
 Corpus grandes (p. ej. `--max-docs` sin límite): `--soft-graph-impl sparse`
-construye el mismo grafo soft k-NN por bloques de filas (`soft_knn_graph_sparse`)
-y la referencia densa de vecinos sin matrices N×N. El valor por defecto es `dense`.
-En FiQA con 1.000 y 5.000 documentos, `sparse` produce los mismos `nDCG@10`,
-`Recall@10`, `neighbor_purity@k` y `edge_overlap_with_dense@k`. Las estadísticas
-del grafo coinciden hasta redondeo float32, y el pico de RSS a 5.000 documentos
-baja de ~1,5 GB a ~0,7 GB. El valor queda registrado en `config.json` como
-`soft_graph_impl`.
+construye el grafo soft k-NN por bloques de filas (`soft_knn_graph_sparse`)
+y calcula la referencia de vecinos por bloques. El valor por defecto es `dense`;
+`soft_graph_impl` queda registrado en `config.json`. La ruta sparse es sólo de
+inferencia: entrenamiento conserva la ruta densa con gradientes.
+
+La calibración automática usa hasta 2.000 puntos y necesita `k > 1` y distancias
+positivas. Ambas opciones de gamma exigen al menos dos puntos finitos; gamma
+explícita debe ser finita y positiva. Se conservan todos los empates: `nnz` puede
+ser cuadrático. La memoria de trabajo es
+`O(block_rows * N + nnz + min(N, 2000)^2)`; CSR no garantiza un grafo pequeño.
+Las pruebas comparan pesos, patrones, métricas y empates con la referencia densa,
+con tolerancias float32 para valores calculados. No constituyen una nueva
+ejecución FiQA ni una mejora demostrada de calidad de recuperación.
 
 Probes rápidos:
 

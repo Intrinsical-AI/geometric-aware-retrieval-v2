@@ -108,3 +108,84 @@ def test_cli_defaults_to_dense_and_accepts_sparse() -> None:
     parser = _benchmark_module().build_argument_parser()
     assert parser.parse_args([]).soft_graph_impl == "dense"
     assert parser.parse_args(["--soft-graph-impl", "sparse"]).soft_graph_impl == "sparse"
+
+
+@pytest.mark.parametrize("kind", ["zero", "tied", "few_neighbors", "rounding_ties"])
+def test_sparse_topk_preserves_dense_ties_and_implicit_zeros(kind: str) -> None:
+    module = _benchmark_module()
+    adjacency = torch.zeros(12, 12)
+    if kind == "tied":
+        adjacency.fill_(1)
+    elif kind == "few_neighbors":
+        adjacency[torch.arange(12), (torch.arange(12) + 1) % 12] = 1
+    elif kind == "rounding_ties":
+        adjacency = torch.ones(12, 12, dtype=torch.float64) + torch.arange(12) * 1e-10
+    expected = module.adjacency_topk_neighbors(adjacency, 4)
+    assert module.adjacency_topk_neighbors(sp.csr_matrix(adjacency.numpy()), 4) == expected
+
+
+@pytest.mark.parametrize("bad_value", [float("nan"), float("inf"), -float("inf")])
+def test_sparse_rejects_nonfinite_embeddings(bad_value: float) -> None:
+    embeddings = torch.randn(6, 3)
+    embeddings[0, 0] = bad_value
+    with pytest.raises(ValueError, match="finite"):
+        soft_knn_graph_sparse(embeddings, k=2, gamma=0.2)
+
+
+@pytest.mark.parametrize("shape", [(0, 3), (1, 3)])
+def test_sparse_rejects_insufficient_points(shape: tuple[int, int]) -> None:
+    with pytest.raises(ValueError, match="at least two"):
+        soft_knn_graph_sparse(torch.zeros(shape), k=2, gamma=0.2)
+
+
+def test_sparse_rejects_degenerate_automatic_calibration() -> None:
+    with pytest.raises(ValueError, match="positive distances"):
+        soft_knn_graph_sparse(torch.zeros(6, 3), k=2)
+
+
+@pytest.mark.parametrize("gamma", [0.0, -0.2, float("nan"), float("inf")])
+def test_sparse_rejects_invalid_gamma(gamma: float) -> None:
+    with pytest.raises(ValueError, match="gamma must be finite and positive"):
+        soft_knn_graph_sparse(_clustered(6), k=2, gamma=gamma)
+
+
+@pytest.mark.parametrize(("k", "block_rows"), [(0, 3), (-1, 3), (2, 0), (2, -1)])
+def test_sparse_rejects_nonpositive_sizes(k: int, block_rows: int) -> None:
+    with pytest.raises(ValueError, match="must be positive"):
+        soft_knn_graph_sparse(_clustered(6), k=k, gamma=0.2, block_rows=block_rows)
+
+
+def test_sparse_requires_explicit_gamma_for_k_one() -> None:
+    with pytest.raises(ValueError, match="requires k > 1"):
+        soft_knn_graph_sparse(_clustered(6), k=1)
+
+
+def test_sparse_rejects_overflowed_distances() -> None:
+    embeddings = torch.tensor([[1e30, 0], [-1e30, 0]])
+    with pytest.raises(ValueError, match="distances must be finite"):
+        soft_knn_graph_sparse(embeddings, k=1, gamma=0.2)
+
+
+def test_explicit_gamma_preserves_all_ties_and_disables_gradients() -> None:
+    embeddings = torch.zeros(12, 3, requires_grad=True)
+    W_d, A_d = soft_knn_graph(embeddings, k=2, gamma=0.2, return_adjacency=True)
+    W_s, A_s = soft_knn_graph_sparse(
+        embeddings, k=2, gamma=0.2, block_rows=3, return_diagnostics=False
+    )
+    assert A_s.nnz == 12 * 11  # Keeping all tied edges can exceed N*k.
+    np.testing.assert_allclose(A_s.toarray(), A_d.detach().numpy(), rtol=2e-5, atol=1e-7)
+    np.testing.assert_allclose(W_s.toarray(), W_d.detach().numpy(), rtol=2e-5, atol=1e-7)
+    assert embeddings.grad is None
+
+
+def test_explicit_gamma_bounds_distance_blocks(monkeypatch) -> None:
+    shapes: list[tuple[int, int]] = []
+    original = torch.cdist
+
+    def cdist(left, right, *args, **kwargs):
+        shapes.append((left.shape[0], right.shape[0]))
+        return original(left, right, *args, **kwargs)
+
+    monkeypatch.setattr(torch, "cdist", cdist)
+    soft_knn_graph_sparse(_clustered(128), k=4, gamma=0.2, block_rows=17)
+    assert shapes and all(rows <= 17 and cols == 128 for rows, cols in shapes)

@@ -10,6 +10,7 @@ los puntos de ruptura de gradiente identificados.
 
 from __future__ import annotations
 
+import logging
 import warnings
 from typing import Any, Tuple
 
@@ -161,15 +162,18 @@ def soft_knn_graph_sparse(
     return_diagnostics: bool = True,
     block_rows: int = 512,
 ) -> Any:
-    """Inference-only ``soft_knn_graph`` that never materializes an N x N matrix.
+    """Inference-only soft-kNN with row blocks and CSR output.
 
     Rows are processed in blocks of ``block_rows`` with the same gamma
     auto-calibration, row softmax, tau-fix, per-row top-k threshold (ties kept),
-    symmetrization and row renormalization as ``soft_knn_graph``. Peak memory is
-    O(block_rows * N + N * k) instead of several N x N tensors. Returns
+    symmetrization and row renormalization as ``soft_knn_graph``. Working memory is
+    O(block_rows * N + nnz + min(N, 2000)**2), including automatic calibration.
+    Ties are preserved, so output nnz can be quadratic rather than N * k. Returns
     ``scipy.sparse.csr_matrix`` weights/adjacency (float32) and the same
     diagnostics; values agree with the dense version up to float32 rounding.
-    No gradients flow through this function.
+    No gradients flow through this function. Requires at least two finite points,
+    positive k and block_rows, and a finite positive gamma. Automatic calibration
+    additionally requires k > 1 and at least one positive pairwise distance.
     """
     import math
 
@@ -177,6 +181,16 @@ def soft_knn_graph_sparse(
     import scipy.sparse as sp
 
     E = embeddings.detach()
+    if E.ndim != 2 or E.size(0) < 2:
+        raise ValueError("embeddings must be a matrix with at least two points")
+    if not torch.isfinite(E).all():
+        raise ValueError("embeddings must be finite")
+    if k < 1 or block_rows < 1:
+        raise ValueError("k and block_rows must be positive")
+    if gamma is None and k <= 1:
+        raise ValueError("automatic gamma calibration requires k > 1")
+    if gamma is not None and (not math.isfinite(gamma) or gamma <= 0):
+        raise ValueError("gamma must be finite and positive")
     N = E.size(0)
     device = E.device
 
@@ -188,11 +202,20 @@ def soft_knn_graph_sparse(
             D2_sample = torch.cdist(E[idx], E[idx], p=2).pow(2)
         else:
             D2_sample = torch.cdist(E, E, p=2).pow(2)
-        sigma2 = torch.quantile(D2_sample[D2_sample > 0], 0.2)
-        del D2_sample
+        if not torch.isfinite(D2_sample).all():
+            raise ValueError("squared distances must be finite")
+        positive_distances = D2_sample[D2_sample > 0]
+        if positive_distances.numel() == 0:
+            raise ValueError("automatic gamma calibration requires positive distances")
+        sigma2 = torch.quantile(positive_distances, 0.2)
+        del D2_sample, positive_distances
         gamma_value = sigma2 / math.log(k)
+        if not math.isfinite(float(gamma_value)) or gamma_value <= 0:
+            raise ValueError("automatic gamma must be finite and positive")
         if return_diagnostics:
-            print(f"Auto-calibrated γ = {gamma_value:.4f} (σ² = {sigma2:.4f})")
+            logging.getLogger(__name__).info(
+                "Auto-calibrated gamma = %.4f (sigma squared = %.4f)", gamma_value, sigma2
+            )
     else:
         gamma_value = gamma
 
@@ -200,6 +223,8 @@ def soft_knn_graph_sparse(
     for r0 in range(0, N, block_rows):
         r1 = min(N, r0 + block_rows)
         D2 = torch.cdist(E[r0:r1], E, p=2).pow(2)
+        if not torch.isfinite(D2).all():
+            raise ValueError("squared distances must be finite")
         Z = -D2 / gamma_value
         local = torch.arange(r1 - r0, device=device)
         Z[local, local + r0] = float("-inf")
