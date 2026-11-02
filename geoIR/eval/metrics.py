@@ -41,12 +41,49 @@ def evaluate_retrieval(
     return _evaluate_run(qrels, run, k_eval=k_eval)
 
 
-def graph_distribution_metrics(A: torch.Tensor) -> Dict[str, float]:
-    """Calculates entropy and effective degree for a graph's adjacency matrix."""
+def graph_distribution_metrics(A: Any) -> Dict[str, float]:
+    """Calculates entropy and effective degree for a graph's adjacency matrix.
+
+    Accepts a dense tensor or a scipy sparse matrix (zeros contribute nothing to either sum).
+    """
+    if _is_scipy_sparse(A):
+        csr = A.tocsr()
+        n = csr.shape[0]
+        row_of = np.repeat(np.arange(n), np.diff(csr.indptr))
+        row_sum = np.asarray(csr.sum(axis=1), dtype=np.float64).ravel()
+        values = csr.data / (row_sum[row_of] + 1e-12)
+        entropy_rows = np.zeros(n)
+        np.add.at(entropy_rows, row_of, values * np.log(values + 1e-12))
+        square_rows = np.zeros(n)
+        np.add.at(square_rows, row_of, values * values)
+        return {
+            "entropy": float(-entropy_rows.mean()),
+            "effective_degree": float(1.0 / square_rows.mean()),
+        }
     A_norm = A / (A.sum(dim=-1, keepdim=True) + 1e-12)
     entropy = -(A_norm * (A_norm + 1e-12).log()).sum(dim=-1).mean()
     eff_degree = 1.0 / (A_norm.pow(2).sum(dim=-1)).mean()
     return {"entropy": entropy.item(), "effective_degree": eff_degree.item()}
+
+
+def _is_scipy_sparse(A: Any) -> bool:
+    try:
+        import scipy.sparse as sp
+    except ImportError:  # pragma: no cover - scipy is a declared dependency
+        return False
+    return sp.issparse(A)
+
+
+def _sub_adjacency(A: Any, idx: torch.Tensor) -> torch.Tensor:
+    """Return ``A[idx][:, idx]`` without materializing the ``len(idx) x N`` row block.
+
+    ``A`` may be a dense tensor or a scipy sparse matrix (returned densified, float32).
+    """
+    if _is_scipy_sparse(A):
+        rows = idx.numpy()
+        block = A.tocsr()[rows][:, rows].toarray()
+        return torch.from_numpy(np.ascontiguousarray(block, dtype=np.float32))
+    return A[idx.unsqueeze(1), idx]
 
 
 def evaluate_retrieval_soft_local(
@@ -54,7 +91,7 @@ def evaluate_retrieval_soft_local(
     doc_emb: torch.Tensor,
     qrels: Dict[str, Dict[str, int]],
     doc_ids: List[str],
-    A_soft: torch.Tensor,
+    A_soft: Any,
     k_eval: int = 10,
     topk: int = 20,
     blend: float = 0.5,
@@ -67,7 +104,8 @@ def evaluate_retrieval_soft_local(
     if not 0.0 <= blend <= 1.0:
         raise ValueError(f"`blend` must be between 0 and 1, got {blend}")
 
-    A_soft = A_soft.cpu()
+    if isinstance(A_soft, torch.Tensor):
+        A_soft = A_soft.cpu()
     sims_all = st_util.cos_sim(query_emb, doc_emb).cpu()
     query_ids = list(qrels.keys())
     run: Dict[str, Dict[str, float]] = {}
@@ -76,7 +114,7 @@ def evaluate_retrieval_soft_local(
         sims = sims_all[i]
         candidate_topk = min(topk, len(doc_ids))
         _, idx = sims.topk(candidate_topk)
-        sub_adj = A_soft[idx][:, idx]
+        sub_adj = _sub_adjacency(A_soft, idx)
         row_sum = sub_adj.sum(dim=-1, keepdim=True) + 1e-12
         sub_adj = sub_adj / row_sum
 
@@ -100,13 +138,14 @@ def evaluate_retrieval_ppr(
     doc_emb: torch.Tensor,
     qrels: Dict[str, Dict[str, int]],
     doc_ids: List[str],
-    A_soft: torch.Tensor,
+    A_soft: Any,
     k_eval: int = 10,
     topk: int = 100,
     alpha: float = 0.2,
 ) -> Tuple[float, float]:
     """Graph-based PPR reranking over a soft graph."""
-    A_soft = A_soft.cpu()
+    if isinstance(A_soft, torch.Tensor):
+        A_soft = A_soft.cpu()
     run: Dict[str, Dict[str, float]] = {}
     sims_all = st_util.cos_sim(query_emb, doc_emb).cpu()
     query_ids = list(qrels.keys())
@@ -115,7 +154,7 @@ def evaluate_retrieval_ppr(
         sims = sims_all[i]
         candidate_topk = min(topk, len(doc_ids))
         _, idx = sims.topk(candidate_topk)
-        sub_adj = A_soft[idx][:, idx]
+        sub_adj = _sub_adjacency(A_soft, idx)
         row_sum = sub_adj.sum(dim=-1, keepdim=True) + 1e-12
         sub_adj = sub_adj / row_sum
         prior = sims[idx].clamp(min=1e-6)

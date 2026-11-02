@@ -10,6 +10,7 @@ los puntos de ruptura de gradiente identificados.
 
 from __future__ import annotations
 
+import logging
 import warnings
 from typing import Any, Tuple
 
@@ -150,6 +151,152 @@ def soft_knn_graph(
         return W, A
     else:
         return W
+
+
+@torch.no_grad()
+def soft_knn_graph_sparse(
+    embeddings: torch.Tensor,
+    k: int = 8,
+    gamma: float | None = None,
+    return_adjacency: bool = True,
+    return_diagnostics: bool = True,
+    block_rows: int = 512,
+) -> Any:
+    """Inference-only soft-kNN with row blocks and CSR output.
+
+    Rows are processed in blocks of ``block_rows`` with the same gamma
+    auto-calibration, row softmax, tau-fix, per-row top-k threshold (ties kept),
+    symmetrization and row renormalization as ``soft_knn_graph``. Working memory is
+    O(block_rows * N + nnz + min(N, 2000)**2), including automatic calibration.
+    Ties are preserved, so output nnz can be quadratic rather than N * k. Returns
+    ``scipy.sparse.csr_matrix`` weights/adjacency (float32) and the same
+    diagnostics; values agree with the dense version up to float32 rounding.
+    No gradients flow through this function. Requires at least two finite points,
+    positive k and block_rows, and a finite positive gamma. Automatic calibration
+    additionally requires k > 1 and at least one positive pairwise distance.
+    """
+    import math
+
+    import numpy as np
+    import scipy.sparse as sp
+
+    E = embeddings.detach()
+    if E.ndim != 2 or E.size(0) < 2:
+        raise ValueError("embeddings must be a matrix with at least two points")
+    if not torch.isfinite(E).all():
+        raise ValueError("embeddings must be finite")
+    if k < 1 or block_rows < 1:
+        raise ValueError("k and block_rows must be positive")
+    if gamma is None and k <= 1:
+        raise ValueError("automatic gamma calibration requires k > 1")
+    if gamma is not None and (not math.isfinite(gamma) or gamma <= 0):
+        raise ValueError("gamma must be finite and positive")
+    N = E.size(0)
+    device = E.device
+
+    gamma_value: float | torch.Tensor
+    if gamma is None:
+        # Same sampling (and global RNG call) as soft_knn_graph; D2 only on the sample.
+        if N > 2000:
+            idx = torch.randperm(N, device=device)[:2000]
+            D2_sample = torch.cdist(E[idx], E[idx], p=2).pow(2)
+        else:
+            D2_sample = torch.cdist(E, E, p=2).pow(2)
+        if not torch.isfinite(D2_sample).all():
+            raise ValueError("squared distances must be finite")
+        positive_distances = D2_sample[D2_sample > 0]
+        if positive_distances.numel() == 0:
+            raise ValueError("automatic gamma calibration requires positive distances")
+        sigma2 = torch.quantile(positive_distances, 0.2)
+        del D2_sample, positive_distances
+        gamma_value = sigma2 / math.log(k)
+        if not math.isfinite(float(gamma_value)) or gamma_value <= 0:
+            raise ValueError("automatic gamma must be finite and positive")
+        if return_diagnostics:
+            logging.getLogger(__name__).info(
+                "Auto-calibrated gamma = %.4f (sigma squared = %.4f)", gamma_value, sigma2
+            )
+    else:
+        gamma_value = gamma
+
+    rows, cols, a_parts, d2_parts = [], [], [], []
+    for r0 in range(0, N, block_rows):
+        r1 = min(N, r0 + block_rows)
+        D2 = torch.cdist(E[r0:r1], E, p=2).pow(2)
+        if not torch.isfinite(D2).all():
+            raise ValueError("squared distances must be finite")
+        Z = -D2 / gamma_value
+        local = torch.arange(r1 - r0, device=device)
+        Z[local, local + r0] = float("-inf")
+        P = torch.softmax(Z, dim=-1)
+        A = P * (k / P.sum(dim=-1, keepdim=True))
+        if k < N - 1:
+            thresh = A.topk(k, dim=-1).values[:, -1].unsqueeze(1)
+            keep = A >= thresh
+        else:
+            keep = torch.ones_like(A, dtype=torch.bool)
+        keep &= A != 0  # exact zeros carry no mass in any later step
+        r, c = keep.nonzero(as_tuple=True)
+        rows.append((r + r0).cpu().numpy())
+        cols.append(c.cpu().numpy())
+        a_parts.append(A[r, c].cpu().numpy())
+        d2_parts.append(D2[r, c].cpu().numpy())
+        del D2, Z, P, A, keep
+
+    row_idx = np.concatenate(rows)
+    col_idx = np.concatenate(cols)
+    kept = sp.csr_matrix(
+        (np.concatenate(a_parts), (row_idx, col_idx)), shape=(N, N), dtype=np.float32
+    )
+    D2_kept = sp.csr_matrix(
+        (np.concatenate(d2_parts), (row_idx, col_idx)), shape=(N, N), dtype=np.float32
+    )
+    A_sym = ((kept + kept.T) * np.float32(0.5)).tocsr()
+    D2_sym = D2_kept.maximum(D2_kept.T).tocsr()  # D2 is symmetric; fill transposed-only entries
+    row_sum = np.asarray(A_sym.sum(axis=1), dtype=np.float32).ravel() + np.float32(1e-8)
+    A_final = (sp.diags(np.float32(k) / row_sum) @ A_sym).tocsr().astype(np.float32)
+    W = A_final.multiply(D2_sym).tocsr().astype(np.float32)
+
+    diagnostics = None
+    if return_diagnostics:
+        row_mass = np.asarray(A_final.sum(axis=1), dtype=np.float64).ravel()
+        A_norm = (sp.diags(1.0 / (row_mass + 1e-12)) @ A_final).tocsr()
+        values = A_norm.data
+        entropy_rows = np.zeros(N)
+        np.add.at(
+            entropy_rows,
+            np.repeat(np.arange(N), np.diff(A_norm.indptr)),
+            values * np.log(values + 1e-12),
+        )
+        square_rows = np.zeros(N)
+        np.add.at(square_rows, np.repeat(np.arange(N), np.diff(A_norm.indptr)), values * values)
+        entropy = float(-entropy_rows.mean())
+        eff_degree = float(1.0 / square_rows.mean())
+        actual_degree = float(row_mass.mean())
+        gamma_used = (
+            float(gamma_value.item())
+            if isinstance(gamma_value, torch.Tensor)
+            else float(gamma_value)
+        )
+        diagnostics = {
+            "gamma_used": gamma_used,
+            "entropy": entropy,
+            "effective_degree": eff_degree,
+            "actual_degree": actual_degree,
+            "target_degree": k,
+            "degree_error": abs(actual_degree - k),
+            "status": "optimal"
+            if entropy > 1.0 and abs(eff_degree - k) < k * 0.3
+            else "suboptimal",
+        }
+
+    if return_diagnostics and return_adjacency:
+        return W, A_final, diagnostics
+    if return_diagnostics:
+        return W, diagnostics
+    if return_adjacency:
+        return W, A_final
+    return W
 
 
 def heat_kernel_distances(
@@ -295,6 +442,7 @@ def geometric_loss_end_to_end(
     kappa_target: float = 0.0,
     heat_time: float = 1.0,
     heat_steps: int = 5,
+    gamma: float | None = None,
 ) -> Tuple[torch.Tensor, dict]:
     """Loss geométrica completamente diferenciable end-to-end.
 
@@ -321,6 +469,9 @@ def geometric_loss_end_to_end(
         Tiempo de difusión para heat kernel.
     heat_steps : int, default 5
         Pasos de aproximación para heat kernel.
+    gamma : float | None, default None
+        Temperatura del soft k-NN, pasada a ``soft_knn_graph``
+        (``None`` = auto-calibración).
 
     Returns
     -------
@@ -362,7 +513,7 @@ def geometric_loss_end_to_end(
     total_nodes = all_embeddings.size(0)
 
     # 2. Construir grafo soft k-NN diferenciable
-    A = soft_knn_graph(all_embeddings, k=min(k_graph, total_nodes - 1))
+    A = soft_knn_graph(all_embeddings, k=min(k_graph, total_nodes - 1), gamma=gamma)
 
     # 3. Calcular distancias geodésicas
     d_geo = heat_kernel_distances(A, t=heat_time, steps=heat_steps)

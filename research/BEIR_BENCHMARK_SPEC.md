@@ -221,6 +221,21 @@ Ejecutar la matriz fija de FiQA:
 uv run python run_exps.py --dataset fiqa --no-download --batch-size 256
 ```
 
+Corpus grandes (p. ej. `--max-docs` sin límite): `--soft-graph-impl sparse`
+construye el grafo soft k-NN por bloques de filas (`soft_knn_graph_sparse`)
+y calcula la referencia de vecinos por bloques. El valor por defecto es `dense`;
+`soft_graph_impl` queda registrado en `config.json`. La ruta sparse es sólo de
+inferencia: entrenamiento conserva la ruta densa con gradientes.
+
+La calibración automática usa hasta 2.000 puntos y necesita `k > 1` y distancias
+positivas. Ambas opciones de gamma exigen al menos dos puntos finitos; gamma
+explícita debe ser finita y positiva. Se conservan todos los empates: `nnz` puede
+ser cuadrático. La memoria de trabajo es
+`O(block_rows * N + nnz + min(N, 2000)^2)`; CSR no garantiza un grafo pequeño.
+Las pruebas comparan pesos, patrones, métricas y empates con la referencia densa,
+con tolerancias float32 para valores calculados. No constituyen una nueva
+ejecución FiQA ni una mejora demostrada de calidad de recuperación.
+
 Probes rápidos:
 
 - [PROBES.md](./PROBES.md) para replay del summary y diagnóstico de columnas.

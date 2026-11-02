@@ -27,6 +27,7 @@ from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
+import scipy.sparse
 import torch
 import torch.nn.functional as F
 
@@ -49,6 +50,7 @@ RESULT_METHOD_BASELINE = "Dense cosine baseline"
 RESULT_METHOD_SOFT_LOCAL = "Soft graph local"
 RESULT_METHOD_SOFT_PPR = "Soft graph + PPR"
 RESOURCE_SAMPLE_INTERVAL_SECONDS = 0.01
+SPARSE_BLOCK_ROWS = 512
 SUMMARY_REQUIRED_RESULT_KEYS = {
     "method",
     "role",
@@ -235,6 +237,15 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Maximum number of queries to keep after deterministic subsampling.",
     )
     parser.add_argument("--k", type=int, default=20, help="Target graph degree.")
+    parser.add_argument(
+        "--soft-graph-impl",
+        default="dense",
+        choices=["dense", "sparse"],
+        help=(
+            "Soft k-NN implementation: 'dense' materializes N x N tensors; 'sparse' builds "
+            "the same graph in row blocks with CSR output. Tied edges can still be quadratic."
+        ),
+    )
     parser.add_argument(
         "--batch-size",
         type=int,
@@ -595,8 +606,14 @@ def combine_peak_metrics(*values: float) -> float:
     return float(max(valid))
 
 
-def dense_topk_neighbors(doc_emb: torch.Tensor, k: int) -> list[list[int]]:
-    """Return top-k cosine neighbors per document, excluding self."""
+def dense_topk_neighbors(
+    doc_emb: torch.Tensor, k: int, block_rows: int | None = None
+) -> list[list[int]]:
+    """Return top-k cosine neighbors per document, excluding self.
+
+    With ``block_rows`` the similarity rows are computed block by block instead of as
+    one N x N matrix (same per-row top-k; similarities may differ by float rounding).
+    """
     num_docs = doc_emb.shape[0]
     if num_docs == 0:
         return []
@@ -605,14 +622,56 @@ def dense_topk_neighbors(doc_emb: torch.Tensor, k: int) -> list[list[int]]:
         return [[] for _ in range(num_docs)]
 
     normed = F.normalize(doc_emb.to(dtype=torch.float32), dim=1)
-    sims = normed @ normed.T
-    sims.fill_diagonal_(float("-inf"))
-    indices = torch.topk(sims, k=neighbor_k, dim=1).indices
-    return [[int(idx) for idx in row.tolist()] for row in indices]
+    if block_rows is None:
+        sims = normed @ normed.T
+        sims.fill_diagonal_(float("-inf"))
+        indices = torch.topk(sims, k=neighbor_k, dim=1).indices
+        return [[int(idx) for idx in row.tolist()] for row in indices]
+
+    neighbors: list[list[int]] = []
+    for start in range(0, num_docs, block_rows):
+        stop = min(num_docs, start + block_rows)
+        sims = normed[start:stop] @ normed.T
+        local = torch.arange(stop - start)
+        sims[local, local + start] = float("-inf")
+        indices = torch.topk(sims, k=neighbor_k, dim=1).indices
+        neighbors.extend([int(idx) for idx in row.tolist()] for row in indices)
+    return neighbors
 
 
-def adjacency_topk_neighbors(adjacency: torch.Tensor, k: int) -> list[list[int]]:
+def adjacency_topk_neighbors(adjacency: Any, k: int) -> list[list[int]]:
     """Return top-k neighbors per document using adjacency weights."""
+    if scipy.sparse.issparse(adjacency):
+        csr = adjacency.astype(np.float32).tocsr(copy=True)
+        csr.sum_duplicates()
+        num_docs = csr.shape[0]
+        neighbor_k = min(k, num_docs - 1)
+        if neighbor_k <= 0:
+            return [[] for _ in range(num_docs)]
+        result = []
+        for row in range(num_docs):
+            start, stop = csr.indptr[row], csr.indptr[row + 1]
+            cols, values = csr.indices[start:stop], csr.data[start:stop]
+            off_diagonal = cols != row
+            cols, values = cols[off_diagonal], values[off_diagonal]
+            order = np.argsort(-values, kind="stable")
+            selected = values[order[:neighbor_k]]
+            tied_boundary = len(values) > neighbor_k and (values[order[neighbor_k]] == selected[-1])
+            if (
+                len(selected) < neighbor_k
+                or selected[-1] <= 0
+                or len(np.unique(selected)) != neighbor_k
+                or tied_boundary
+            ):
+                # The dense reference uses torch.topk's tie order, including implicit
+                # zero entries. Reproduce it using only one dense row of temporary space.
+                dense_row = torch.zeros(num_docs, dtype=torch.float32)
+                dense_row[torch.from_numpy(cols.astype(np.int64))] = torch.from_numpy(values)
+                dense_row[row] = float("-inf")
+                result.append([int(col) for col in dense_row.topk(neighbor_k).indices.tolist()])
+            else:
+                result.append([int(col) for col in cols[order[:neighbor_k]]])
+        return result
     if adjacency.is_sparse:
         dense_adj = adjacency.to_dense()
     else:
@@ -720,6 +779,12 @@ def default_soft_graph_fn(*args, **kwargs):
     from geoIR.geo.differentiable import soft_knn_graph
 
     return soft_knn_graph(*args, **kwargs)
+
+
+def default_soft_graph_sparse_fn(*args, **kwargs):
+    from geoIR.geo.differentiable import soft_knn_graph_sparse
+
+    return soft_knn_graph_sparse(*args, **kwargs)
 
 
 def tensor_cache_paths(
@@ -842,8 +907,11 @@ def build_result_row(
     }
 
 
-def safe_degree_std(adjacency: torch.Tensor) -> float:
+def safe_degree_std(adjacency: Any) -> float:
     """Return a stable degree std even for tiny fixtures."""
+    if scipy.sparse.issparse(adjacency):
+        sparse_degrees = np.asarray(adjacency.sum(axis=1), dtype=np.float64).ravel()
+        return 0.0 if sparse_degrees.size <= 1 else float(sparse_degrees.std())
     degrees = adjacency.sum(dim=-1)
     if degrees.numel() <= 1:
         return 0.0
@@ -1238,6 +1306,12 @@ class BeirExperimentRunner(ExperimentRunner):
         self.graph_metric_fn = graph_metric_fn
         self.download_dataset_fn = download_dataset_fn
 
+    def _soft_graph_impl(self) -> str:
+        return str(getattr(self.args, "soft_graph_impl", "dense"))
+
+    def _sparse_block_rows(self) -> int | None:
+        return SPARSE_BLOCK_ROWS if self._soft_graph_impl() == "sparse" else None
+
     @property
     def experiment_root(self) -> Path:
         return self.base_output_dir / self.experiment_name
@@ -1256,6 +1330,7 @@ class BeirExperimentRunner(ExperimentRunner):
             "max_docs": self.args.max_docs,
             "max_queries": self.args.max_queries,
             "k": self.args.k,
+            "soft_graph_impl": self._soft_graph_impl(),
             "device": self.args.device,
             "rerank": self.args.rerank,
             "ppr_topk": self.args.ppr_topk,
@@ -1422,8 +1497,11 @@ class BeirExperimentRunner(ExperimentRunner):
         dense_neighbors: list[list[int]],
     ) -> dict[str, Any]:
         self.logger.info("✨ Building soft k-NN τ-fix graph…")
+        graph_fn = self.soft_graph_fn
+        if self._soft_graph_impl() == "sparse" and graph_fn is default_soft_graph_fn:
+            graph_fn = default_soft_graph_sparse_fn
         (_, adjacency, diagnostics), build = measure_phase(
-            self.soft_graph_fn,
+            graph_fn,
             doc_emb,
             monitor_device=self.args.device,
             k=self.args.k,
@@ -1504,7 +1582,9 @@ class BeirExperimentRunner(ExperimentRunner):
     def run(self) -> None:
         bundle = self._load_dataset_bundle()
         encode_artifacts = self._load_embeddings(bundle)
-        dense_neighbors = dense_topk_neighbors(encode_artifacts.doc_emb, self.args.k)
+        dense_neighbors = dense_topk_neighbors(
+            encode_artifacts.doc_emb, self.args.k, block_rows=self._sparse_block_rows()
+        )
         results = [
             self._run_dense_baseline(
                 encode_artifacts.doc_emb,
